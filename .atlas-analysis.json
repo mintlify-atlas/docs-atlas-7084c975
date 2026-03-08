@@ -1,0 +1,163 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "milcapy",
+  "projectDescription": "Python library for 2D structural analysis of frames, trusses, and finite element membranes",
+  "theme": "aspen",
+  "primaryColor": "#94cb04",
+  "lightColor": "#545454",
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/model",
+              "concepts/materials-sections",
+              "concepts/nodes-elements",
+              "concepts/load-patterns",
+              "concepts/boundary-conditions"
+            ]
+          },
+          {
+            "group": "Elements",
+            "pages": [
+              "elements/beams",
+              "elements/trusses",
+              "elements/membrane-cst",
+              "elements/membrane-q4",
+              "elements/membrane-q6",
+              "elements/membrane-q6i",
+              "elements/membrane-q8"
+            ]
+          },
+          {
+            "group": "Analysis",
+            "pages": [
+              "analysis/solving",
+              "analysis/results",
+              "analysis/visualization"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "advanced/end-offsets",
+              "advanced/releases",
+              "advanced/elastic-supports",
+              "advanced/local-axes"
+            ]
+          },
+          {
+            "group": "Examples",
+            "pages": [
+              "examples/simple-portal",
+              "examples/truss-analysis",
+              "examples/membrane-analysis"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Core API",
+            "pages": [
+              "api/system-model",
+              "api/model-viewer"
+            ]
+          },
+          {
+            "group": "Materials & Sections",
+            "pages": [
+              "api/materials",
+              "api/sections"
+            ]
+          },
+          {
+            "group": "Nodes & Elements",
+            "pages": [
+              "api/nodes",
+              "api/members",
+              "api/trusses",
+              "api/membranes"
+            ]
+          },
+          {
+            "group": "Loads & Boundary Conditions",
+            "pages": [
+              "api/load-patterns",
+              "api/loads",
+              "api/restraints"
+            ]
+          },
+          {
+            "group": "Analysis & Results",
+            "pages": [
+              "api/solve",
+              "api/results"
+            ]
+          },
+          {
+            "group": "Enums & Types",
+            "pages": [
+              "api/enums"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "2D structural analysis with frame and truss elements",
+    "Finite element membrane analysis (CST, Q4, Q6, Q6i, Q8)",
+    "Timoshenko and Euler-Bernoulli beam theories",
+    "Advanced features: end offsets, releases, elastic supports",
+    "Interactive visualization with model_viewer",
+    "Comprehensive results extraction and post-processing"
+  ],
+  "publicApiSurface": [
+    "SystemModel",
+    "model_viewer()",
+    "add_material()",
+    "add_rectangular_section()",
+    "add_circular_section()",
+    "add_generic_section()",
+    "add_shell_section()",
+    "add_node()",
+    "add_member()",
+    "add_truss()",
+    "add_cst()",
+    "add_membrane_q4()",
+    "add_membrane_q6()",
+    "add_membrane_q6i()",
+    "add_membrane_q8()",
+    "add_load_pattern()",
+    "add_restraint()",
+    "add_elastic_support()",
+    "add_point_load()",
+    "add_distributed_load()",
+    "add_prescribed_dof()",
+    "solve()",
+    "get_results()",
+    "BeamTheoriesType",
+    "CoordinateSystemType",
+    "DirectionType",
+    "StateType",
+    "LoadType",
+    "FieldType",
+    "ConstitutiveModelType",
+    "IntegrationType"
+  ]
+}
