@@ -1,0 +1,786 @@
+---
+title: "SystemModel"
+description: "Main class for creating and managing structural models"
+---
+
+## Overview
+
+`SystemModel` is the primary class for building 2D structural analysis models in milcapy. It manages all model components including materials, sections, nodes, elements, loads, and analysis results.
+
+## Constructor
+
+```python
+from milcapy import SystemModel
+
+model = SystemModel()
+```
+
+Creates an empty structural model.
+
+## Materials
+
+### add_material()
+
+Adds a material to the model.
+
+```python
+model.add_material(
+    name="concrete",
+    modulus_elasticity=2.1e6,
+    poisson_ratio=0.2,
+    specific_weight=2400
+)
+```
+
+<ParamField path="name" type="str" required>
+  Unique name for the material
+</ParamField>
+
+<ParamField path="modulus_elasticity" type="float" required>
+  Modulus of elasticity (E) in force per area units
+</ParamField>
+
+<ParamField path="poisson_ratio" type="float" required>
+  Poisson's ratio (ν), must be in range (-1, 0.5)
+</ParamField>
+
+<ParamField path="specific_weight" type="float" default="0.0">
+  Specific weight or density (kg/m³ or N/m³)
+</ParamField>
+
+<ResponseField name="Material" type="Material">
+  Returns the created Material object
+</ResponseField>
+
+## Sections
+
+### add_rectangular_section()
+
+Adds a rectangular cross-section to the model.
+
+```python
+model.add_rectangular_section(
+    name="beam_section",
+    material_name="concrete",
+    base=0.3,
+    height=0.5
+)
+```
+
+<ParamField path="name" type="str" required>
+  Unique name for the section
+</ParamField>
+
+<ParamField path="material_name" type="str" required>
+  Name of previously defined material
+</ParamField>
+
+<ParamField path="base" type="float" required>
+  Width of the rectangular section
+</ParamField>
+
+<ParamField path="height" type="float" required>
+  Height of the rectangular section
+</ParamField>
+
+<ResponseField name="Section" type="RectangularSection">
+  Returns the created Section object
+</ResponseField>
+
+### add_circular_section()
+
+Adds a circular cross-section to the model.
+
+```python
+model.add_circular_section(
+    name="column_section",
+    material_name="steel",
+    diameter=0.3
+)
+```
+
+<ParamField path="name" type="str" required>
+  Unique name for the section
+</ParamField>
+
+<ParamField path="material_name" type="str" required>
+  Name of previously defined material
+</ParamField>
+
+<ParamField path="diameter" type="float" required>
+  Diameter of the circular section (must be positive)
+</ParamField>
+
+<ResponseField name="Section" type="CircularSection">
+  Returns the created Section object
+</ResponseField>
+
+### add_generic_section()
+
+Adds a generic section with custom geometric properties.
+
+```python
+model.add_generic_section(
+    name="custom_section",
+    material_name="steel",
+    area=0.05,
+    inertia=0.0001,
+    k_factor=0.85
+)
+```
+
+<ParamField path="name" type="str" required>
+  Unique name for the section
+</ParamField>
+
+<ParamField path="material_name" type="str" required>
+  Name of previously defined material
+</ParamField>
+
+<ParamField path="area" type="float" required>
+  Cross-sectional area
+</ParamField>
+
+<ParamField path="inertia" type="float" required>
+  Moment of inertia
+</ParamField>
+
+<ParamField path="k_factor" type="float" required>
+  Shear coefficient factor (Ac = A * k_factor)
+</ParamField>
+
+<ResponseField name="Section" type="GenericSection">
+  Returns the created Section object
+</ResponseField>
+
+### add_shell_section()
+
+Adds a shell section for membrane/plate elements.
+
+```python
+model.add_shell_section(
+    name="wall_section",
+    material_name="concrete",
+    thickness=0.2
+)
+```
+
+<ParamField path="name" type="str" required>
+  Unique name for the section
+</ParamField>
+
+<ParamField path="material_name" type="str" required>
+  Name of previously defined material
+</ParamField>
+
+<ParamField path="thickness" type="float" required>
+  Thickness of the shell element
+</ParamField>
+
+<ResponseField name="ShellSection" type="ShellSection">
+  Returns the created ShellSection object
+</ResponseField>
+
+## Nodes
+
+### add_node()
+
+Adds a node to the model.
+
+```python
+model.add_node(id=1, x=0.0, y=0.0)
+model.add_node(id=2, x=5.0, y=0.0)
+```
+
+<ParamField path="id" type="int" required>
+  Unique node identifier
+</ParamField>
+
+<ParamField path="x" type="float" required>
+  X-coordinate of the node
+</ParamField>
+
+<ParamField path="y" type="float" required>
+  Y-coordinate of the node
+</ParamField>
+
+<ResponseField name="Node" type="Node">
+  Returns the created Node object
+</ResponseField>
+
+## Members
+
+### add_member()
+
+Adds a frame member (beam/column) to the model.
+
+```python
+from milcapy import BeamTheoriesType
+
+model.add_member(
+    id=1,
+    node_i_id=1,
+    node_j_id=2,
+    section_name="beam_section",
+    beam_theory=BeamTheoriesType.TIMOSHENKO
+)
+```
+
+<ParamField path="id" type="int" required>
+  Unique member identifier
+</ParamField>
+
+<ParamField path="node_i_id" type="int" required>
+  ID of the start node
+</ParamField>
+
+<ParamField path="node_j_id" type="int" required>
+  ID of the end node
+</ParamField>
+
+<ParamField path="section_name" type="str" required>
+  Name of previously defined section
+</ParamField>
+
+<ParamField path="beam_theory" type="BeamTheoriesType | str" default="BeamTheoriesType.TIMOSHENKO">
+  Beam theory to use: `TIMOSHENKO` or `EULER_BERNOULLI`
+</ParamField>
+
+<ResponseField name="Member" type="Member">
+  Returns the created Member object
+</ResponseField>
+
+### add_elastic_timoshenko_beam()
+
+Adds a Timoshenko beam with axial stiffness.
+
+```python
+model.add_elastic_timoshenko_beam(
+    id=1,
+    node_i_id=1,
+    node_j_id=2,
+    section_name="beam_section"
+)
+```
+
+<ParamField path="id" type="int" required>
+  Unique member identifier
+</ParamField>
+
+<ParamField path="node_i_id" type="int" required>
+  ID of the start node
+</ParamField>
+
+<ParamField path="node_j_id" type="int" required>
+  ID of the end node
+</ParamField>
+
+<ParamField path="section_name" type="str" required>
+  Name of previously defined section
+</ParamField>
+
+### add_elastic_euler_bernoulli_beam()
+
+Adds an Euler-Bernoulli beam with axial stiffness.
+
+```python
+model.add_elastic_euler_bernoulli_beam(
+    id=1,
+    node_i_id=1,
+    node_j_id=2,
+    section_name="beam_section"
+)
+```
+
+<ParamField path="id" type="int" required>
+  Unique member identifier
+</ParamField>
+
+<ParamField path="node_i_id" type="int" required>
+  ID of the start node
+</ParamField>
+
+<ParamField path="node_j_id" type="int" required>
+  ID of the end node
+</ParamField>
+
+<ParamField path="section_name" type="str" required>
+  Name of previously defined section
+</ParamField>
+
+### add_truss()
+
+Adds a truss element (axial force only).
+
+```python
+model.add_truss(
+    id=1,
+    node_i_id=1,
+    node_j_id=2,
+    section_name="truss_section"
+)
+```
+
+<ParamField path="id" type="int" required>
+  Unique truss identifier
+</ParamField>
+
+<ParamField path="node_i_id" type="int" required>
+  ID of the start node
+</ParamField>
+
+<ParamField path="node_j_id" type="int" required>
+  ID of the end node
+</ParamField>
+
+<ParamField path="section_name" type="str" required>
+  Name of previously defined section
+</ParamField>
+
+## Boundary Conditions
+
+### add_restraint()
+
+Adds restraints (boundary conditions) to a node.
+
+```python
+model.add_restraint(
+    node_id=1,
+    ux=True,   # Restrain X translation
+    uy=True,   # Restrain Y translation
+    rz=True    # Restrain Z rotation
+)
+```
+
+<ParamField path="node_id" type="int" required>
+  ID of the node to restrain
+</ParamField>
+
+<ParamField path="ux" type="bool" required>
+  Restrain translation in X direction
+</ParamField>
+
+<ParamField path="uy" type="bool" required>
+  Restrain translation in Y direction
+</ParamField>
+
+<ParamField path="rz" type="bool" required>
+  Restrain rotation about Z axis
+</ParamField>
+
+## Load Patterns
+
+### add_load_pattern()
+
+Creates a load pattern for organizing loads.
+
+```python
+from milcapy import StateType
+
+model.add_load_pattern(
+    name="Live Load",
+    self_weight_multiplier=0.0,
+    state=StateType.ACTIVE
+)
+```
+
+<ParamField path="name" type="str" required>
+  Unique name for the load pattern
+</ParamField>
+
+<ParamField path="self_weight_multiplier" type="float" default="0.0">
+  Multiplier for self-weight (1.0 = full self-weight)
+</ParamField>
+
+<ParamField path="state" type="StateType | str" default="StateType.ACTIVE">
+  Load pattern state: `ACTIVE` or `INACTIVE`
+</ParamField>
+
+### add_point_load()
+
+Adds a point load to a node.
+
+```python
+from milcapy import CoordinateSystemType
+
+model.add_point_load(
+    node_id=2,
+    load_pattern_name="Live Load",
+    fx=100.0,
+    fy=-200.0,
+    mz=50.0,
+    CSys=CoordinateSystemType.GLOBAL
+)
+```
+
+<ParamField path="node_id" type="int" required>
+  ID of the node to apply load
+</ParamField>
+
+<ParamField path="load_pattern_name" type="str" required>
+  Name of the load pattern
+</ParamField>
+
+<ParamField path="fx" type="float" default="0.0">
+  Force in X direction
+</ParamField>
+
+<ParamField path="fy" type="float" default="0.0">
+  Force in Y direction
+</ParamField>
+
+<ParamField path="mz" type="float" default="0.0">
+  Moment about Z axis
+</ParamField>
+
+<ParamField path="CSys" type="CoordinateSystemType | str" default="GLOBAL">
+  Coordinate system: `GLOBAL` or `LOCAL`
+</ParamField>
+
+<ParamField path="replace" type="bool" default="False">
+  Replace existing load if True, otherwise add to existing
+</ParamField>
+
+### add_distributed_load()
+
+Adds a distributed load to a member.
+
+```python
+from milcapy import DirectionType, LoadType
+
+model.add_distributed_load(
+    member_id=1,
+    load_pattern_name="Dead Load",
+    load_start=-10.0,
+    load_end=-10.0,
+    CSys="LOCAL",
+    direction=DirectionType.LOCAL_2,
+    load_type=LoadType.FORCE
+)
+```
+
+<ParamField path="member_id" type="int" required>
+  ID of the member to apply load
+</ParamField>
+
+<ParamField path="load_pattern_name" type="str" required>
+  Name of the load pattern
+</ParamField>
+
+<ParamField path="load_start" type="float" default="0.0">
+  Load magnitude at start of member
+</ParamField>
+
+<ParamField path="load_end" type="float" default="0.0">
+  Load magnitude at end of member
+</ParamField>
+
+<ParamField path="CSys" type="CoordinateSystemType | str" default="LOCAL">
+  Coordinate system: `GLOBAL` or `LOCAL`
+</ParamField>
+
+<ParamField path="direction" type="DirectionType | str" default="LOCAL_2">
+  Load direction: `LOCAL_1`, `LOCAL_2`, `X`, `Y`, `GRAVITY`, etc.
+</ParamField>
+
+<ParamField path="load_type" type="LoadType | str" default="FORCE">
+  Type of load: `FORCE` or `MOMENT`
+</ParamField>
+
+<ParamField path="replace" type="bool" default="False">
+  Replace existing load if True
+</ParamField>
+
+## Analysis
+
+### solve()
+
+Solves the structural model using the direct stiffness method.
+
+```python
+results = model.solve()
+
+# Or solve specific load patterns
+results = model.solve(load_pattern_name=["Dead Load", "Live Load"])
+```
+
+<ParamField path="load_pattern_name" type="list[str] | None" default="None">
+  List of load pattern names to solve. If None, solves all active patterns.
+</ParamField>
+
+<ResponseField name="results" type="Dict[str, Results]">
+  Dictionary mapping load pattern names to Results objects
+</ResponseField>
+
+## Results
+
+### get_results()
+
+Retrieves analysis results for a specific load pattern.
+
+```python
+results = model.get_results("Live Load")
+
+# Access node displacements
+displacements = results.get_node_displacements(2)
+print(f"ux={displacements[0]}, uy={displacements[1]}, rz={displacements[2]}")
+```
+
+<ParamField path="load_pattern_name" type="str" required>
+  Name of the load pattern
+</ParamField>
+
+<ResponseField name="Results" type="Results">
+  Results object containing displacements, reactions, and internal forces
+</ResponseField>
+
+### get_global_stiffness_matrix()
+
+Returns the assembled global stiffness matrix.
+
+```python
+K = model.get_global_stiffness_matrix()
+```
+
+<ResponseField name="K" type="NDArray">
+  Global stiffness matrix
+</ResponseField>
+
+### get_global_load_vector()
+
+Returns the global load vector for a load pattern.
+
+```python
+F = model.get_global_load_vector("Live Load")
+```
+
+<ParamField path="load_pattern_name" type="str" required>
+  Name of the load pattern
+</ParamField>
+
+<ResponseField name="F" type="NDArray">
+  Global load vector
+</ResponseField>
+
+## Visualization
+
+### show()
+
+Launches the interactive model viewer window.
+
+```python
+model.solve()
+model.show()
+```
+
+<Note>
+  The model must be solved before calling `show()`. The viewer displays the model geometry, loads, deformed shape, and internal force diagrams.
+</Note>
+
+### plot_model()
+
+Creates a static plot of the model.
+
+```python
+model.plot_model(
+    load_pattern="Live Load",
+    node_labels=True,
+    member_labels=True
+)
+```
+
+<ParamField path="load_pattern" type="str | None" default="None">
+  Load pattern to display loads for
+</ParamField>
+
+<ParamField path="node_labels" type="bool" default="True">
+  Show node ID labels
+</ParamField>
+
+<ParamField path="member_labels" type="bool" default="True">
+  Show member ID labels
+</ParamField>
+
+## Advanced Features
+
+### add_elastic_support()
+
+Adds an elastic support (spring) to a node.
+
+```python
+model.add_elastic_support(
+    node_id=2,
+    kx=1000.0,  # Spring stiffness in X
+    ky=2000.0,  # Spring stiffness in Y
+    krz=500.0,  # Rotational spring stiffness
+    CSys="GLOBAL"
+)
+```
+
+<ParamField path="node_id" type="int" required>
+  ID of the node
+</ParamField>
+
+<ParamField path="kx" type="float | None" default="None">
+  Spring stiffness in X direction
+</ParamField>
+
+<ParamField path="ky" type="float | None" default="None">
+  Spring stiffness in Y direction
+</ParamField>
+
+<ParamField path="krz" type="float | None" default="None">
+  Rotational spring stiffness about Z
+</ParamField>
+
+<ParamField path="CSys" type="CoordinateSystemType | str" default="GLOBAL">
+  Coordinate system for the spring
+</ParamField>
+
+### add_end_length_offset()
+
+Adds rigid end offsets to a member (rigid arms).
+
+```python
+model.add_end_length_offset(
+    member_id=1,
+    la=0.2,  # Offset at start node
+    lb=0.3,  # Offset at end node
+    qla=True,  # Apply loads on rigid arm at start
+    qlb=True,  # Apply loads on rigid arm at end
+    fla=1.0,   # Rigidity factor at start
+    flb=1.0    # Rigidity factor at end
+)
+```
+
+<ParamField path="member_id" type="int" required>
+  ID of the member
+</ParamField>
+
+<ParamField path="la" type="float" default="0">
+  Length offset at start node
+</ParamField>
+
+<ParamField path="lb" type="float" default="0">
+  Length offset at end node
+</ParamField>
+
+<ParamField path="qla" type="bool" default="True">
+  Apply loads on rigid arm at start
+</ParamField>
+
+<ParamField path="qlb" type="bool" default="True">
+  Apply loads on rigid arm at end
+</ParamField>
+
+<ParamField path="fla" type="float" default="1">
+  Rigidity factor for start offset (1.0 = fully rigid)
+</ParamField>
+
+<ParamField path="flb" type="float" default="1">
+  Rigidity factor for end offset (1.0 = fully rigid)
+</ParamField>
+
+### add_releases()
+
+Adds member end releases.
+
+```python
+model.add_releases(
+    member_id=1,
+    pi=False,  # Axial release at start
+    vi=False,  # Shear release at start
+    mi=True,   # Moment release at start (pinned)
+    pj=False,  # Axial release at end
+    vj=False,  # Shear release at end
+    mj=False   # Moment release at end
+)
+```
+
+<ParamField path="member_id" type="int" required>
+  ID of the member
+</ParamField>
+
+<ParamField path="pi" type="bool" default="False">
+  Release axial force at start node
+</ParamField>
+
+<ParamField path="vi" type="bool" default="False">
+  Release shear force at start node
+</ParamField>
+
+<ParamField path="mi" type="bool" default="False">
+  Release moment at start node
+</ParamField>
+
+<ParamField path="pj" type="bool" default="False">
+  Release axial force at end node
+</ParamField>
+
+<ParamField path="vj" type="bool" default="False">
+  Release shear force at end node
+</ParamField>
+
+<ParamField path="mj" type="bool" default="False">
+  Release moment at end node
+</ParamField>
+
+<Warning>
+  Cannot release both ends for the same force type (e.g., pi=True and pj=True is invalid)
+</Warning>
+
+## Example
+
+```python
+from milcapy import SystemModel, BeamTheoriesType
+
+# Create model
+model = SystemModel()
+
+# Define material
+model.add_material(
+    name="concrete",
+    modulus_elasticity=2.1e6,
+    poisson_ratio=0.2,
+    specific_weight=2400
+)
+
+# Define section
+model.add_rectangular_section(
+    name="beam_30x50",
+    material_name="concrete",
+    base=0.3,
+    height=0.5
+)
+
+# Create nodes
+model.add_node(1, 0, 0)
+model.add_node(2, 5, 0)
+model.add_node(3, 10, 0)
+
+# Create members
+model.add_member(1, 1, 2, "beam_30x50", BeamTheoriesType.TIMOSHENKO)
+model.add_member(2, 2, 3, "beam_30x50", BeamTheoriesType.TIMOSHENKO)
+
+# Apply supports
+model.add_restraint(1, True, True, True)  # Fixed
+model.add_restraint(3, False, True, False)  # Roller
+
+# Add loads
+model.add_load_pattern("Dead Load", self_weight_multiplier=1.0)
+model.add_distributed_load(1, "Dead Load", load_start=-10, load_end=-10)
+model.add_distributed_load(2, "Dead Load", load_start=-10, load_end=-10)
+
+model.add_load_pattern("Live Load")
+model.add_point_load(2, "Live Load", fy=-50.0)
+
+# Solve
+results = model.solve()
+
+# Get results
+node_2_disp = model.get_results("Live Load").get_node_displacements(2)
+print(f"Node 2 vertical displacement: {node_2_disp[1]:.6f}")
+
+# Visualize
+model.show()
+```

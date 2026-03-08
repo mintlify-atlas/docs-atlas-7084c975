@@ -1,0 +1,392 @@
+---
+title: 'Membrane Elements'
+description: 'Add 2D membrane elements for plane stress/strain analysis'
+---
+
+Milcapy provides several membrane element types for 2D finite element analysis in plane stress or plane strain conditions.
+
+## add_cst()
+
+Add a Constant Strain Triangle (CST) membrane element - a 3-node triangular element.
+
+### Syntax
+
+```python
+model.add_cst(id, node_i_id, node_j_id, node_k_id, section_name, state='PLANE_STRESS')
+```
+
+### Parameters
+
+<ParamField path="id" type="int" required>
+  Unique identifier for the CST element.
+</ParamField>
+
+<ParamField path="node_i_id" type="int" required>
+  ID of the first node.
+</ParamField>
+
+<ParamField path="node_j_id" type="int" required>
+  ID of the second node.
+</ParamField>
+
+<ParamField path="node_k_id" type="int" required>
+  ID of the third node.
+</ParamField>
+
+<ParamField path="section_name" type="str" required>
+  Name of the shell section (defined with `add_shell_section()`).
+</ParamField>
+
+<ParamField path="state" type="str | ConstitutiveModelType" default="'PLANE_STRESS'">
+  Constitutive model for the element:
+  - `'PLANE_STRESS'` - Plane stress condition (thin plates)
+  - `'PLANE_STRAIN'` - Plane strain condition (thick members)
+</ParamField>
+
+### Returns
+
+Returns a `MembraneTriangle` object. Each node has 2 degrees of freedom (ux, uy).
+
+### Example
+
+```python
+import milcapy as milca
+
+model = milca.SystemMilcaModel()
+
+# Define material and shell section
+model.add_material('concrete', modulus_elasticity=25e9, poisson_ratio=0.2)
+model.add_shell_section('wall', 'concrete', thickness=0.15)
+
+# Add nodes (counterclockwise)
+model.add_node(1, 0.0, 0.0)
+model.add_node(2, 1.0, 0.0)
+model.add_node(3, 0.5, 0.866)
+
+# Add CST element
+model.add_cst(1, 1, 2, 3, 'wall', state='PLANE_STRESS')
+```
+
+<Warning>
+  Nodes must be enumerated in counterclockwise order to ensure proper element formulation.
+</Warning>
+
+---
+
+## add_membrane_q4()
+
+Add a 4-node bilinear quadrilateral membrane element (Q4) with 4-point integration.
+
+### Syntax
+
+```python
+model.add_membrane_q4(id, node_i_id, node_j_id, node_k_id, node_l_id, section_name, state='PLANE_STRESS')
+```
+
+### Parameters
+
+<ParamField path="id" type="int" required>
+  Unique identifier for the Q4 element.
+</ParamField>
+
+<ParamField path="node_i_id" type="int" required>
+  ID of the first node.
+</ParamField>
+
+<ParamField path="node_j_id" type="int" required>
+  ID of the second node.
+</ParamField>
+
+<ParamField path="node_k_id" type="int" required>
+  ID of the third node.
+</ParamField>
+
+<ParamField path="node_l_id" type="int" required>
+  ID of the fourth node.
+</ParamField>
+
+<ParamField path="section_name" type="str" required>
+  Name of the shell section.
+</ParamField>
+
+<ParamField path="state" type="str | ConstitutiveModelType" default="'PLANE_STRESS'">
+  Constitutive model: `'PLANE_STRESS'` or `'PLANE_STRAIN'`.
+</ParamField>
+
+### Returns
+
+Returns a `MembraneQuad4` object. Each node has 2 degrees of freedom (ux, uy).
+
+### Example
+
+```python
+# Add nodes for quadrilateral (counterclockwise)
+model.add_node(1, 0.0, 0.0)
+model.add_node(2, 2.0, 0.0)
+model.add_node(3, 2.0, 1.5)
+model.add_node(4, 0.0, 1.5)
+
+# Add Q4 element
+model.add_membrane_q4(1, 1, 2, 3, 4, 'wall', state='PLANE_STRESS')
+```
+
+<Note>
+  The Q4 element has poor convergence. It's recommended to use mesh refinement or prefer Q8 elements for better accuracy.
+</Note>
+
+---
+
+## add_membrane_q6()
+
+Add a 4-node quadrilateral membrane element with drilling degrees of freedom (Q6) - 3 DOF per node.
+
+### Syntax
+
+```python
+model.add_membrane_q6(id, node_i_id, node_j_id, node_k_id, node_l_id, section_name, state='PLANE_STRESS')
+```
+
+### Parameters
+
+<ParamField path="id" type="int" required>
+  Unique identifier for the Q6 element.
+</ParamField>
+
+<ParamField path="node_i_id" type="int" required>
+  ID of the first node.
+</ParamField>
+
+<ParamField path="node_j_id" type="int" required>
+  ID of the second node.
+</ParamField>
+
+<ParamField path="node_k_id" type="int" required>
+  ID of the third node.
+</ParamField>
+
+<ParamField path="node_l_id" type="int" required>
+  ID of the fourth node.
+</ParamField>
+
+<ParamField path="section_name" type="str" required>
+  Name of the shell section.
+</ParamField>
+
+<ParamField path="state" type="str | ConstitutiveModelType" default="'PLANE_STRESS'">
+  Constitutive model: `'PLANE_STRESS'` or `'PLANE_STRAIN'`.
+</ParamField>
+
+### Returns
+
+Returns a `MembraneQuad6` object. Each node has 3 degrees of freedom (ux, uy, rz).
+
+### Example
+
+```python
+model.add_membrane_q6(1, 1, 2, 3, 4, 'wall', state='PLANE_STRESS')
+```
+
+<Info>
+  This element implements the Q6 formulation from Dr. Wilson's "Static and Dynamic Analysis of Structures" with drilling degrees of freedom.
+</Info>
+
+---
+
+## add_membrane_q6i()
+
+Add a 4-node quadrilateral membrane element with incompatible modes (Q6I) - similar to ETABS/SAP2000.
+
+### Syntax
+
+```python
+model.add_membrane_q6i(id, node_i_id, node_j_id, node_k_id, node_l_id, section_name, state='PLANE_STRESS')
+```
+
+### Parameters
+
+<ParamField path="id" type="int" required>
+  Unique identifier for the Q6I element.
+</ParamField>
+
+<ParamField path="node_i_id" type="int" required>
+  ID of the first node.
+</ParamField>
+
+<ParamField path="node_j_id" type="int" required>
+  ID of the second node.
+</ParamField>
+
+<ParamField path="node_k_id" type="int" required>
+  ID of the third node.
+</ParamField>
+
+<ParamField path="node_l_id" type="int" required>
+  ID of the fourth node.
+</ParamField>
+
+<ParamField path="section_name" type="str" required>
+  Name of the shell section.
+</ParamField>
+
+<ParamField path="state" type="str | ConstitutiveModelType" default="'PLANE_STRESS'">
+  Constitutive model: `'PLANE_STRESS'` or `'PLANE_STRAIN'`.
+</ParamField>
+
+### Returns
+
+Returns a `MembraneQuad6I` object. Each node has 2 degrees of freedom (ux, uy).
+
+### Example
+
+```python
+model.add_membrane_q6i(1, 1, 2, 3, 4, 'wall', state='PLANE_STRESS')
+```
+
+<Info>
+  The Q6I element uses the same formulation as ETABS and SAP2000, making it suitable for compatibility with those programs.
+</Info>
+
+---
+
+## add_membrane_q8()
+
+Add an 8-node serendipity quadrilateral membrane element (Q8) with selectable integration.
+
+### Syntax
+
+```python
+model.add_membrane_q8(id, node_i_id, node_j_id, node_k_id, node_l_id, section_name, state='PLANE_STRESS', integration='COMPLETE')
+```
+
+### Parameters
+
+<ParamField path="id" type="int" required>
+  Unique identifier for the Q8 element.
+</ParamField>
+
+<ParamField path="node_i_id" type="int" required>
+  ID of the first corner node.
+</ParamField>
+
+<ParamField path="node_j_id" type="int" required>
+  ID of the second corner node.
+</ParamField>
+
+<ParamField path="node_k_id" type="int" required>
+  ID of the third corner node.
+</ParamField>
+
+<ParamField path="node_l_id" type="int" required>
+  ID of the fourth corner node.
+</ParamField>
+
+<ParamField path="section_name" type="str" required>
+  Name of the shell section.
+</ParamField>
+
+<ParamField path="state" type="str | ConstitutiveModelType" default="'PLANE_STRESS'">
+  Constitutive model: `'PLANE_STRESS'` or `'PLANE_STRAIN'`.
+</ParamField>
+
+<ParamField path="integration" type="str | IntegrationType" default="'COMPLETE'">
+  Integration scheme:
+  - `'COMPLETE'` - 9-point Gauss integration
+  - `'REDUCED'` - 4-point Gauss integration (reduces shear locking)
+</ParamField>
+
+### Returns
+
+Returns a `MembraneQuad8` object. Each node has 2 degrees of freedom (ux, uy).
+
+### Example
+
+```python
+# Add corner nodes only (mid-side nodes are computed automatically)
+model.add_node(1, 0.0, 0.0)
+model.add_node(2, 4.0, 0.0)
+model.add_node(3, 4.0, 3.0)
+model.add_node(4, 0.0, 3.0)
+
+# Add Q8 element with reduced integration
+model.add_membrane_q8(1, 1, 2, 3, 4, 'wall', 
+                      state='PLANE_STRESS', 
+                      integration='REDUCED')
+```
+
+<Warning>
+  The Q8 element has 8 nodes total. The 4 mid-side nodes are automatically computed at the midpoint of the quadrilateral edges and condensed into the 4 corner nodes.
+</Warning>
+
+<Note>
+  The Q8 element provides excellent convergence with a single element. Avoid over-discretization, as excessive mesh refinement can make the element overly flexible and diverge from the exact solution. Reduced integration helps mitigate parasitic shear locking.
+</Note>
+
+---
+
+## Element Comparison
+
+<CardGroup cols={2}>
+  <Card title="CST (3-node)" icon="triangle">
+    Simplest element. Constant strain field. Use for simple geometries or refined meshes.
+  </Card>
+  <Card title="Q4 (4-node)" icon="square">
+    Basic quadrilateral. Poor convergence - requires mesh refinement.
+  </Card>
+  <Card title="Q6 (4-node + drilling)" icon="arrow-rotate-right">
+    Includes rotational DOF. Based on Wilson's formulation.
+  </Card>
+  <Card title="Q6I (4-node + incompatible)" icon="table-cells">
+    Incompatible modes. Compatible with ETABS/SAP2000.
+  </Card>
+  <Card title="Q8 (8-node)" icon="grid">
+    Higher-order element. Excellent accuracy with single element. Reduced integration available.
+  </Card>
+</CardGroup>
+
+## General Notes
+
+<Warning>
+  All quadrilateral elements require nodes to be enumerated in counterclockwise order for proper formulation.
+</Warning>
+
+<Info>
+  Use `add_shell_section()` to define thickness and material properties for membrane elements.
+</Info>
+
+## Complete Example
+
+```python
+import milcapy as milca
+
+model = milca.SystemMilcaModel()
+
+# Define material and section
+model.add_material('steel', modulus_elasticity=200e9, poisson_ratio=0.3)
+model.add_shell_section('plate', 'steel', thickness=0.01)
+
+# Create a mesh with different element types
+model.add_node(1, 0.0, 0.0)
+model.add_node(2, 1.0, 0.0)
+model.add_node(3, 2.0, 0.0)
+model.add_node(4, 0.0, 1.0)
+model.add_node(5, 1.0, 1.0)
+model.add_node(6, 2.0, 1.0)
+model.add_node(7, 0.5, 0.5)
+
+# Add CST element
+model.add_cst(1, 1, 2, 7, 'plate', state='PLANE_STRESS')
+
+# Add Q4 element
+model.add_membrane_q4(2, 2, 3, 6, 5, 'plate', state='PLANE_STRESS')
+
+# Add Q8 element with reduced integration
+model.add_membrane_q8(3, 1, 4, 5, 2, 'plate', 
+                      state='PLANE_STRESS', 
+                      integration='REDUCED')
+```
+
+## Related
+
+- [add_node()](/api/nodes) - Add nodes to the model
+- [add_member()](/api/members) - Add frame/beam elements
+- [add_truss()](/api/trusses) - Add truss elements

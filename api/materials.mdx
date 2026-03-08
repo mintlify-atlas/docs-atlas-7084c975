@@ -1,0 +1,296 @@
+---
+title: "Materials API"
+description: "Define material properties for structural analysis"
+---
+
+## Overview
+
+Materials define the physical properties of structural elements. milcapy uses elastic material models characterized by modulus of elasticity, Poisson's ratio, and specific weight.
+
+## add_material()
+
+Adds a material to the structural model.
+
+```python
+model.add_material(
+    name="concrete",
+    modulus_elasticity=2.1e6,
+    poisson_ratio=0.2,
+    specific_weight=2400
+)
+```
+
+### Parameters
+
+<ParamField path="name" type="str" required>
+  Unique identifier for the material. This name is used when defining sections.
+</ParamField>
+
+<ParamField path="modulus_elasticity" type="float" required>
+  Modulus of elasticity (E) in force per area units (e.g., kN/m², MPa, psi).
+  
+  Must be greater than 0.
+</ParamField>
+
+<ParamField path="poisson_ratio" type="float" required>
+  Poisson's ratio (ν) - dimensionless material property.
+  
+  Must be in the range (-1, 0.5). Common values:
+  - Concrete: 0.15 - 0.20
+  - Steel: 0.27 - 0.30
+  - Aluminum: 0.33
+</ParamField>
+
+<ParamField path="specific_weight" type="float" default="0.0">
+  Specific weight or mass density.
+  
+  Units depend on your force system:
+  - Force-based: N/m³, kN/m³, lb/ft³
+  - Mass-based: kg/m³, slug/ft³
+  
+  Set to 0 to ignore self-weight.
+</ParamField>
+
+### Returns
+
+<ResponseField name="Material" type="Material">
+  Returns the created Material object with the following properties:
+  
+  - `name`: Material name
+  - `E`: Modulus of elasticity
+  - `v`: Poisson's ratio
+  - `g`: Specific weight
+  - `G`: Shear modulus (computed as E / (2(1 + ν)))
+  - `alpha`: Coefficient of thermal expansion (default: 1e-6)
+</ResponseField>
+
+## Material Properties
+
+Once created, materials have the following computed properties:
+
+### Shear Modulus (G)
+
+The shear modulus is automatically calculated from the elastic modulus and Poisson's ratio:
+
+```
+G = E / (2(1 + ν))
+```
+
+```python
+material = model.add_material("steel", 2.0e5, 0.3)
+print(f"Shear modulus: {material.G}")  # 76923.08
+```
+
+## Examples
+
+### Common Structural Materials
+
+```python
+from milcapy import SystemModel
+
+model = SystemModel()
+
+# Concrete (SI units: MPa, kg/m³)
+model.add_material(
+    name="C25_concrete",
+    modulus_elasticity=25000,  # MPa
+    poisson_ratio=0.2,
+    specific_weight=2400  # kg/m³
+)
+
+# Structural Steel (SI units)
+model.add_material(
+    name="A36_steel",
+    modulus_elasticity=200000,  # MPa
+    poisson_ratio=0.3,
+    specific_weight=7850  # kg/m³
+)
+
+# Aluminum
+model.add_material(
+    name="aluminum_6061",
+    modulus_elasticity=69000,  # MPa
+    poisson_ratio=0.33,
+    specific_weight=2700  # kg/m³
+)
+
+# Wood
+model.add_material(
+    name="douglas_fir",
+    modulus_elasticity=13000,  # MPa
+    poisson_ratio=0.35,
+    specific_weight=500  # kg/m³
+)
+```
+
+### Material Without Self-Weight
+
+```python
+# For analysis where self-weight is negligible or handled separately
+model.add_material(
+    name="idealized_steel",
+    modulus_elasticity=2.0e5,
+    poisson_ratio=0.3,
+    specific_weight=0  # No self-weight
+)
+```
+
+### US Customary Units
+
+```python
+# Steel in ksi and lb/ft³
+model.add_material(
+    name="steel_us",
+    modulus_elasticity=29000,  # ksi
+    poisson_ratio=0.3,
+    specific_weight=490  # lb/ft³
+)
+
+# Concrete in ksi and lb/ft³
+model.add_material(
+    name="concrete_us",
+    modulus_elasticity=3600,  # ksi
+    poisson_ratio=0.2,
+    specific_weight=150  # lb/ft³
+)
+```
+
+## Unit Consistency
+
+<Warning>
+  Ensure all units are consistent throughout your model. milcapy does not perform unit conversions.
+</Warning>
+
+### SI Units Example
+
+```python
+# All units in N, m, Pa
+model.add_material(
+    name="concrete",
+    modulus_elasticity=25e9,  # Pa (25 GPa)
+    poisson_ratio=0.2,
+    specific_weight=24000  # N/m³
+)
+```
+
+### Common Unit Systems
+
+| System | Force | Length | Pressure | Density |
+|--------|-------|--------|----------|----------|
+| SI | N | m | Pa (N/m²) | kg/m³ |
+| SI (kN) | kN | m | kPa (kN/m²) | kg/m³ |
+| SI (MPa) | N | mm | MPa (N/mm²) | kg/mm³ |
+| US Customary | lb | ft | psf (lb/ft²) | lb/ft³ |
+| US (kip) | kip | in | ksi (kip/in²) | kip/in³ |
+
+## Validation
+
+The `add_material()` function performs the following validations:
+
+<Check>
+  **Modulus of Elasticity**: Must be greater than 0
+</Check>
+
+<Check>
+  **Poisson's Ratio**: Must be in range (-1, 0.5)
+</Check>
+
+<Check>
+  **Specific Weight**: Must be non-negative (≥ 0)
+</Check>
+
+<Check>
+  **Unique Name**: Material name must not already exist in the model
+</Check>
+
+### Error Examples
+
+```python
+# These will raise ValueError
+
+# Invalid elastic modulus
+model.add_material("bad_mat", -1000, 0.2)  # E must be > 0
+
+# Invalid Poisson's ratio
+model.add_material("bad_mat", 25000, 0.6)  # ν must be < 0.5
+
+# Negative specific weight
+model.add_material("bad_mat", 25000, 0.2, -100)  # g must be ≥ 0
+
+# Duplicate name
+model.add_material("concrete", 25000, 0.2)
+model.add_material("concrete", 30000, 0.2)  # Name already exists
+```
+
+## Material Types
+
+milcapy uses generic elastic materials. The material behavior is linear elastic with the following constitutive relationship:
+
+### 3D Stress-Strain Relationship
+
+For isotropic materials:
+
+```
+σ = E * ε  (uniaxial)
+τ = G * γ  (shear)
+```
+
+Where:
+- σ = normal stress
+- ε = normal strain
+- τ = shear stress
+- γ = shear strain
+- E = modulus of elasticity
+- G = shear modulus = E / (2(1 + ν))
+
+## Self-Weight Application
+
+When `specific_weight` is specified, self-weight can be activated through load patterns:
+
+```python
+model.add_material(
+    name="concrete",
+    modulus_elasticity=25000,
+    poisson_ratio=0.2,
+    specific_weight=2400
+)
+
+model.add_rectangular_section("beam", "concrete", 0.3, 0.5)
+
+# Enable self-weight in a load pattern
+model.add_load_pattern(
+    name="Dead Load",
+    self_weight_multiplier=1.0  # Full self-weight
+)
+
+# Or apply partial self-weight
+model.add_load_pattern(
+    name="Construction Load",
+    self_weight_multiplier=0.5  # 50% of self-weight
+)
+```
+
+Self-weight is calculated as:
+
+```
+W = specific_weight × section_area × member_length × self_weight_multiplier
+```
+
+## Advanced: Thermal Properties
+
+Material objects include thermal expansion coefficients (currently for future use):
+
+```python
+material = model.add_material("steel", 2.0e5, 0.3)
+
+# These are set to default values (1e-6)
+print(material.alpha)  # Linear thermal expansion coefficient
+print(material.beta)   # Surface thermal expansion coefficient
+print(material.gamma)  # Volumetric thermal expansion coefficient
+```
+
+## See Also
+
+- [Sections API](/api/sections) - Define cross-sections using materials
+- [SystemModel](/api/system-model) - Main model class
+- [Load Patterns](/api/system-model#add_load_pattern) - Apply self-weight loads

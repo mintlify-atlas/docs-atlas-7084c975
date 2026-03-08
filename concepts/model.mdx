@@ -1,0 +1,224 @@
+---
+title: 'SystemModel Class'
+description: 'Understanding the core SystemMilcaModel class and model structure'
+icon: 'cube'
+---
+
+## Overview
+
+The `SystemMilcaModel` is the central class in milcapy that represents your entire structural model. It acts as a container that collects and manages all structural components including materials, sections, nodes, elements, load patterns, and analysis results.
+
+## Creating a Model
+
+<Steps>
+  <Step title="Import milcapy">
+    ```python
+    from milcapy import SystemMilcaModel
+    ```
+  </Step>
+  
+  <Step title="Initialize the model">
+    ```python
+    model = SystemMilcaModel()
+    ```
+  </Step>
+  
+  <Step title="Add components">
+    Add materials, sections, nodes, elements, and loads to build your structural model.
+  </Step>
+</Steps>
+
+## Model Components
+
+The `SystemMilcaModel` organizes structural data into the following collections:
+
+<CardGroup cols={2}>
+  <Card title="Materials" icon="flask">
+    Dictionary of material definitions with elastic properties
+  </Card>
+  
+  <Card title="Sections" icon="shapes">
+    Cross-sectional properties linked to materials
+  </Card>
+  
+  <Card title="Nodes" icon="circle-dot">
+    Geometric points in 2D space
+  </Card>
+  
+  <Card title="Elements" icon="diagram-project">
+    Structural members connecting nodes
+  </Card>
+  
+  <Card title="Load Patterns" icon="weight-hanging">
+    Collections of applied loads and boundary conditions
+  </Card>
+  
+  <Card title="Results" icon="chart-line">
+    Analysis outputs for each load pattern
+  </Card>
+</CardGroup>
+
+## Complete Example
+
+```python
+from milcapy import SystemMilcaModel
+
+# Create a new structural model
+model = SystemMilcaModel()
+
+# Add a material (concrete)
+material = model.add_material(
+    name="C25",
+    modulus_elasticity=25e9,  # Pa
+    poisson_ratio=0.2,
+    specific_weight=24000     # N/m³
+)
+
+# Add a rectangular section
+section = model.add_rectangular_section(
+    name="SEC-30x50",
+    material_name="C25",
+    base=0.30,    # m
+    height=0.50   # m
+)
+
+# Add nodes
+node1 = model.add_node(id=1, x=0.0, y=0.0)
+node2 = model.add_node(id=2, x=4.0, y=0.0)
+node3 = model.add_node(id=3, x=4.0, y=3.0)
+
+# Add a frame member (beam)
+member = model.add_member(
+    id=1,
+    node_i_id=1,
+    node_j_id=2,
+    section_name="SEC-30x50",
+    beam_theory="TIMOSHENKO"
+)
+
+# Add boundary conditions
+model.add_restraint(node_id=1, ux=True, uy=True, rz=True)  # Fixed support
+model.add_restraint(node_id=2, ux=False, uy=True, rz=False) # Roller support
+
+# Create a load pattern
+load_pattern = model.add_load_pattern(
+    name="DL",
+    self_weight_multiplier=1.0
+)
+
+# Add loads
+model.add_point_load(
+    node_id=3,
+    load_pattern_name="DL",
+    fx=0.0,
+    fy=-10000.0,  # 10 kN downward
+    mz=0.0
+)
+```
+
+## Model Data Structure
+
+The model stores components in dictionaries for efficient access:
+
+```python
+# Access materials by name
+material = model.materials["C25"]
+
+# Access sections by name
+section = model.sections["SEC-30x50"]
+
+# Access nodes by ID
+node = model.nodes[1]
+
+# Access members by ID
+member = model.members[1]
+
+# Access load patterns by name
+load_pattern = model.load_patterns["DL"]
+```
+
+## Element Type Collections
+
+milcapy supports multiple element types, each stored in its own collection:
+
+| Collection | Element Type | Description |
+|------------|--------------|-------------|
+| `model.members` | Frame/Beam elements | 3 DOF per node (ux, uy, rz) |
+| `model.trusses` | Truss elements | 2 DOF per node (ux, uy) |
+| `model.csts` | Triangle membrane | Constant Strain Triangle |
+| `model.membrane_q3dof` | Quad membrane (3 DOF) | Q6, Q6IMod with drilling DOF |
+| `model.membrane_q2dof` | Quad membrane (2 DOF) | Q4, Q6I, Q8 elements |
+
+<Note>
+  All element collections use integer IDs as keys, making it easy to reference specific elements: `model.members[1]`, `model.trusses[2]`, etc.
+</Note>
+
+## Analysis and Visualization
+
+The model provides properties for analysis and visualization:
+
+```python
+# Analysis manager
+model.analysis = AnalysisManager(model)
+
+# Plotter for visualization
+model.plotter = Plotter(model)
+
+# Post-processing options
+model.postprocessing_options.factor = 10  # Deformation scale factor
+model.postprocessing_options.n = 17       # Number of divisions
+
+# Plotter options
+model.plotter_options.show_node_labels = True
+model.plotter_options.show_member_labels = True
+```
+
+## Global Matrices
+
+After analysis, the model stores the global system matrices:
+
+```python
+# Global stiffness matrix (assembled from all elements)
+K = model.global_stiffness_matrix
+
+# Load vectors for each load pattern
+F = model.global_load_vector["DL"]  # Load vector for "DL" pattern
+```
+
+## Best Practices
+
+<Tip>
+  **Naming Convention**: Use descriptive names for materials, sections, and load patterns. For example: `"C25"` for concrete grade, `"SEC-30x50"` for section dimensions, `"DL"` for dead load.
+</Tip>
+
+<Warning>
+  **Unique Identifiers**: All nodes and elements must have unique integer IDs. Attempting to add a node or element with an existing ID will raise a `ValueError`.
+</Warning>
+
+<Tip>
+  **Material Before Section**: Always add materials to the model before creating sections that reference them.
+</Tip>
+
+<Tip>
+  **Nodes Before Elements**: Ensure all nodes are added to the model before creating elements that connect them.
+</Tip>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Materials & Sections" icon="flask" href="/concepts/materials-sections">
+    Learn about defining material properties and cross-sections
+  </Card>
+  
+  <Card title="Nodes & Elements" icon="diagram-project" href="/concepts/nodes-elements">
+    Understand how to create the structural geometry
+  </Card>
+  
+  <Card title="Load Patterns" icon="weight-hanging" href="/concepts/load-patterns">
+    Add loads and define load cases
+  </Card>
+  
+  <Card title="Boundary Conditions" icon="anchor" href="/concepts/boundary-conditions">
+    Apply supports and restraints
+  </Card>
+</CardGroup>

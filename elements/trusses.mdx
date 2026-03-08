@@ -1,0 +1,259 @@
+---
+title: "Truss Elements"
+description: "Two-dimensional truss elements for axial-only structural analysis"
+---
+
+## Overview
+
+Truss elements are 2D structural members that carry only axial forces (tension or compression). They are ideal for modeling:
+
+- Truss bridges
+- Roof trusses  
+- Space frames (2D projection)
+- Bracing systems
+- Tension/compression members
+
+<Info>
+Truss elements have 2 degrees of freedom per node (translations in x and y). Moments and shear forces are not transmitted through truss connections.
+</Info>
+
+## Adding Truss Elements
+
+```python
+model.add_truss(
+    id=1,
+    node_i_id=1,
+    node_j_id=2,
+    section_name='L4x4x1/2'
+)
+```
+
+**Parameters:**
+- `id` (int) → Truss member ID
+- `node_i_id` (int) → Initial node ID
+- `node_j_id` (int) → Final node ID
+- `section_name` (str) → Section name (typically defined by area)
+
+## Degrees of Freedom
+
+Each node has only 2 translational DOF:
+
+```
+Node i: [Uxi, Uyi]
+Node j: [Uxj, Uyj]
+```
+
+Where:
+- `Ux` = Displacement in x direction
+- `Uy` = Displacement in y direction
+- No rotational DOF (pinned connections assumed)
+
+<Note>
+The absence of rotational DOF means truss elements automatically have pinned connections at both ends.
+</Note>
+
+## Element Formulation
+
+### Local Stiffness Matrix
+
+The local stiffness matrix for a truss element is:
+
+```
+K_local = (E * A / L) * [[ 1, -1],
+                         [-1,  1]]
+```
+
+Where:
+- `E` = Young's modulus
+- `A` = Cross-sectional area
+- `L` = Element length
+
+### Transformation Matrix
+
+The transformation from local to global coordinates:
+
+```python
+L = sqrt((xj - xi)² + (yj - yi)²)
+cx = (xj - xi) / L  # Direction cosine x
+cy = (yj - yi) / L  # Direction cosine y
+
+T = [[cx, cy,  0,  0],
+     [ 0,  0, cx, cy]]
+```
+
+### Global Stiffness Matrix
+
+```
+K_global = T^T * K_local * T
+```
+
+This results in a 4×4 global stiffness matrix relating the 4 DOF.
+
+## Distributed Loads
+
+You can apply distributed axial loads along truss members:
+
+```python
+from milcapy.loads.load import DistributedLoad
+
+truss.set_current_load_pattern('Wind')
+truss.set_distributed_load(DistributedLoad(
+    p_i=5.0,  # Axial load at node i (force/length)
+    p_j=5.0   # Axial load at node j (force/length)
+))
+```
+
+The equivalent nodal forces are computed as:
+
+```python
+F_i = (2*p_i + p_j) * L / 6
+F_j = (2*p_j + p_i) * L / 6
+```
+
+<Tip>
+Distributed loads are automatically converted to equivalent nodal forces during assembly.
+</Tip>
+
+## Example: Simple Truss
+
+```python
+import milcapy as mx
+
+# Create model
+model = mx.Model()
+
+# Define nodes for a simple truss
+model.add_node(1, 0, 0)     # Left support
+model.add_node(2, 4, 0)     # Right support  
+model.add_node(3, 2, 3)     # Top node
+
+# Define material (only E and A needed for trusses)
+model.add_material('Steel', E=200e9, v=0.3, rho=7850)
+
+# Define section (area is the key property)
+model.add_section('Rod', material='Steel', A=0.001)  # 1000 mm²
+
+# Add truss members
+model.add_truss(id=1, node_i_id=1, node_j_id=3, section_name='Rod')
+model.add_truss(id=2, node_i_id=2, node_j_id=3, section_name='Rod')
+model.add_truss(id=3, node_i_id=1, node_j_id=2, section_name='Rod')
+
+# Apply boundary conditions
+model.add_support(node_id=1, ux=True, uy=True)  # Pin support
+model.add_support(node_id=2, ux=False, uy=True) # Roller support
+
+# Apply loads
+model.add_load_pattern('Live')
+model.add_nodal_load(node_id=3, fx=0, fy=-10000)  # 10 kN downward
+
+# Solve
+model.solve('Live')
+```
+
+## Example: Bridge Truss
+
+```python
+import milcapy as mx
+
+# Create a Warren truss bridge
+model = mx.Model()
+
+# Bottom chord nodes
+for i in range(6):
+    model.add_node(i+1, i*2, 0)
+
+# Top chord nodes  
+for i in range(5):
+    model.add_node(i+7, i*2+1, 2)
+
+# Material and sections
+model.add_material('Steel', E=200e9, v=0.3, rho=7850)
+model.add_section('Chord', material='Steel', A=0.003)
+model.add_section('Web', material='Steel', A=0.002)
+
+# Bottom chord
+for i in range(5):
+    model.add_truss(i+1, i+1, i+2, 'Chord')
+
+# Top chord
+for i in range(4):
+    model.add_truss(i+6, i+7, i+8, 'Chord')
+
+# Web members (diagonal and vertical)
+model.add_truss(11, 1, 7, 'Web')   # Diagonal
+model.add_truss(12, 7, 2, 'Web')   # Diagonal
+model.add_truss(13, 2, 8, 'Web')   # Diagonal
+# ... continue pattern
+```
+
+## Analysis Results
+
+After solving, you can extract:
+
+### Axial Force
+
+```python
+# Get member displacements
+u = model.get_member_displacements(member_id=1)
+
+# Calculate axial force
+E = truss.section.E()
+A = truss.section.A()
+L = truss.length()
+
+# Local displacement
+u_local = truss.transformation_matrix() @ u
+axial_force = (E * A / L) * (u_local[1] - u_local[0])
+
+print(f"Axial force: {axial_force:.2f} N")
+print(f"Stress: {axial_force/A:.2f} Pa")
+```
+
+### Member Stress State
+
+```python
+if axial_force > 0:
+    print("Member in TENSION")
+else:
+    print("Member in COMPRESSION")
+```
+
+<Warning>
+**Important:** Truss members in compression must be checked for buckling. Milcapy computes axial forces only; stability checks must be performed separately.
+</Warning>
+
+## Best Practices
+
+<CardGroup cols={2}>
+
+<Card title="Node Ordering" icon="arrows-turn-right">
+  Node order affects force sign convention. Positive force = tension from node i to node j.
+</Card>
+
+<Card title="Section Properties" icon="ruler">
+  Only `E` (modulus) and `A` (area) affect truss behavior. Other properties are ignored.
+</Card>
+
+<Card title="Stability" icon="triangle-exclamation">
+  Check compression members for buckling using Euler's formula or code provisions.
+</Card>
+
+<Card title="Geometry" icon="shapes">
+  Avoid nearly collinear members which can cause numerical instability.
+</Card>
+
+</CardGroup>
+
+## Comparison with Beam Elements
+
+| Feature | Truss Element | Beam Element |
+|---------|--------------|-------------|
+| DOF per node | 2 (Ux, Uy) | 3 (Ux, Uy, Rz) |
+| Forces transmitted | Axial only | Axial, shear, moment |
+| End connections | Always pinned | Can be fixed/pinned/released |
+| Use case | Tension/compression | Bending members |
+| Stiffness matrix | 4×4 | 6×6 |
+
+<Tip>
+For members that may carry bending moments, use beam elements instead of trusses.
+</Tip>

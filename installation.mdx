@@ -1,0 +1,100 @@
+---
+title: Installation
+description: Learn how to install milcapy and its dependencies
+---
+
+## Requirements
+
+Before installing milcapy, ensure you have Python 3.10 or higher installed on your system.
+
+<Note>
+  milcapy requires Python ≥ 3.10 to run properly.
+</Note>
+
+## Installing milcapy
+
+<Steps>
+  <Step title="Install via pip">
+    The easiest way to install milcapy is using pip:
+
+    ```bash
+    pip install milcapy
+    ```
+
+    This will automatically install milcapy and all required dependencies.
+  </Step>
+
+  <Step title="Verify installation">
+    After installation, verify that milcapy is installed correctly by importing it in Python:
+
+    ```python
+    from milcapy import SystemModel
+    print("milcapy installed successfully!")
+    ```
+
+    If the import succeeds without errors, you're ready to start using milcapy.
+  </Step>
+</Steps>
+
+## Dependencies
+
+milcapy automatically installs the following required dependencies:
+
+- **numpy** - For numerical computations and matrix operations
+- **matplotlib** - For visualization and plotting capabilities
+
+<Tip>
+  You don't need to install these dependencies manually - they will be installed automatically when you install milcapy.
+</Tip>
+
+## Upgrading milcapy
+
+To upgrade to the latest version of milcapy:
+
+```bash
+pip install --upgrade milcapy
+```
+
+## Installation Issues
+
+If you encounter any issues during installation:
+
+<Warning>
+  Make sure you're using Python 3.10 or higher. You can check your Python version with:
+  
+  ```bash
+  python --version
+  ```
+</Warning>
+
+### Common Solutions
+
+1. **Upgrade pip**: Ensure you have the latest version of pip:
+   ```bash
+   pip install --upgrade pip
+   ```
+
+2. **Use virtual environment**: It's recommended to use a virtual environment to avoid dependency conflicts:
+   ```bash
+   python -m venv myenv
+   source myenv/bin/activate  # On Windows: myenv\Scripts\activate
+   pip install milcapy
+   ```
+
+3. **Check permissions**: If you encounter permission errors, try installing with the `--user` flag:
+   ```bash
+   pip install --user milcapy
+   ```
+
+## Next Steps
+
+Now that you have milcapy installed, you're ready to create your first structural analysis model!
+
+<CardGroup cols={2}>
+  <Card title="Quickstart Guide" icon="rocket" href="/quickstart">
+    Build your first structural model in minutes
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/system-model">
+    Explore the complete API documentation
+  </Card>
+</CardGroup>

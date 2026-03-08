@@ -1,0 +1,324 @@
+---
+title: Member Releases
+description: Control force and moment transfer at member connections using releases
+---
+
+## Overview
+
+Member releases allow you to control how forces and moments are transferred at member connections. By releasing specific internal forces (axial force, shear, or moment) at either end of a member, you can model various connection types from fully fixed to pinned or custom partial releases.
+
+Releases are essential for accurately representing real structural connections, which often don't transfer all force components. For example, a simple bolted connection might transfer shear and axial forces but not significant moments (a pinned connection).
+
+## When to Use Releases
+
+<CardGroup cols={2}>
+  <Card title="Pinned Connections" icon="circle-dot">
+    Model connections that don't transfer moment (e.g., simple beam connections)
+  </Card>
+  <Card title="Truss Members" icon="diagram-project">
+    Create axial-only members in truss structures
+  </Card>
+  <Card title="Slotted Connections" icon="arrows-left-right">
+    Model connections that allow movement in specific directions
+  </Card>
+  <Card title="Simplified Connections" icon="link-slash">
+    Represent connection behavior when full fixity isn't realistic
+  </Card>
+</CardGroup>
+
+## Syntax
+
+```python
+model.add_releases(
+    member_id,
+    pi=False,   # Release axial force at start node
+    vi=False,   # Release shear at start node
+    mi=False,   # Release moment at start node
+    pj=False,   # Release axial force at end node
+    vj=False,   # Release shear at end node
+    mj=False    # Release moment at end node
+)
+```
+
+### Parameters
+
+<ParamField path="member_id" type="int" required>
+  ID of the member to apply releases to
+</ParamField>
+
+<ParamField path="pi" type="bool" default="False">
+  Release axial force at the start node (node i). When `True`, the member cannot transfer axial force at this end.
+</ParamField>
+
+<ParamField path="vi" type="bool" default="False">
+  Release shear force at the start node (node i). When `True`, the member cannot transfer shear at this end.
+</ParamField>
+
+<ParamField path="mi" type="bool" default="False">
+  Release moment at the start node (node i). When `True`, the connection acts as a pin at this end.
+</ParamField>
+
+<ParamField path="pj" type="bool" default="False">
+  Release axial force at the end node (node j). When `True`, the member cannot transfer axial force at this end.
+</ParamField>
+
+<ParamField path="vj" type="bool" default="False">
+  Release shear force at the end node (node j). When `True`, the member cannot transfer shear at this end.
+</ParamField>
+
+<ParamField path="mj" type="bool" default="False">
+  Release moment at the end node (node j). When `True`, the connection acts as a pin at this end.
+</ParamField>
+
+## Common Connection Types
+
+### Pinned Connection (Both Ends)
+
+A simply supported beam with pinned connections at both ends:
+
+```python
+from milcapy import SystemModel, BeamTheoriesType
+
+model = SystemModel()
+
+# Define material and section
+model.add_material("concrete", modulus_elasticity=2.1e6, poisson_ratio=0.2)
+model.add_rectangular_section("beam", "concrete", base=0.3, height=0.5)
+
+# Create beam
+model.add_node(1, 0, 0)
+model.add_node(2, 6, 0)
+model.add_member(1, 1, 2, "beam", BeamTheoriesType.EULER_BERNOULLI)
+
+# Release moments at both ends (pinned-pinned)
+model.add_releases(
+    member_id=1,
+    mi=True,  # Pin at start
+    mj=True   # Pin at end
+)
+
+# Add supports
+model.add_restraint(1, True, True, False)  # Pin support
+model.add_restraint(2, True, True, False)  # Roller support
+
+# Add distributed load
+model.add_load_pattern("Live Load")
+model.add_distributed_load(1, "Live Load", qa=0, qb=-10, typ="fy")
+
+# Solve
+model.solve()
+model.show()
+```
+
+<Tip>
+Pinned connections (moment releases) are the most common type of release in practice. They're used to model simple shear connections that don't develop significant moment.
+</Tip>
+
+### Fixed-Pinned Connection
+
+A cantilever with a moment release at the free end:
+
+```python
+# Create cantilever beam
+model.add_node(1, 0, 0)
+model.add_node(2, 4, 0)
+model.add_member(1, 1, 2, "beam", BeamTheoriesType.TIMOSHENKO)
+
+# Fixed at start, pinned at end
+model.add_releases(
+    member_id=1,
+    mi=False,  # Fixed at start (no release)
+    mj=True    # Pinned at end
+)
+
+# Boundary conditions
+model.add_restraint(1, True, True, True)  # Fixed support
+model.add_restraint(2, False, False, False)  # Free end
+```
+
+### Truss Member (Axial Only)
+
+Create a member that only carries axial force:
+
+```python
+# Create truss member
+model.add_member(5, 3, 4, "truss_section", BeamTheoriesType.EULER_BERNOULLI)
+
+# Release shear and moment at both ends (axial only)
+model.add_releases(
+    member_id=5,
+    vi=True,  # Release shear at start
+    mi=True,  # Release moment at start
+    vj=True,  # Release shear at end
+    mj=True   # Release moment at end
+)
+```
+
+<Note>
+For truss members, release both shear and moment at both ends. This ensures the member only develops axial forces, which is the fundamental assumption of truss analysis.
+</Note>
+
+## Advanced Examples
+
+### Partial Frame with Mixed Connections
+
+A frame with different connection types:
+
+```python
+model = SystemModel()
+
+# Define materials
+model.add_material("steel", modulus_elasticity=2.1e8, poisson_ratio=0.3)
+model.add_rectangular_section("column", "steel", base=0.3, height=0.3)
+model.add_rectangular_section("beam", "steel", base=0.25, height=0.4)
+
+# Create frame
+model.add_node(1, 0, 0)      # Base left
+model.add_node(2, 0, 3)      # Top left
+model.add_node(3, 5, 3)      # Top right
+model.add_node(4, 5, 0)      # Base right
+
+# Members
+model.add_member(1, 1, 2, "column", BeamTheoriesType.TIMOSHENKO)  # Left column
+model.add_member(2, 2, 3, "beam", BeamTheoriesType.TIMOSHENKO)    # Beam
+model.add_member(3, 3, 4, "column", BeamTheoriesType.TIMOSHENKO)  # Right column
+
+# Beam with pinned connection at right end only
+model.add_releases(
+    member_id=2,
+    mi=False,  # Fixed to left column
+    mj=True    # Pinned to right column
+)
+
+# Supports
+model.add_restraint(1, True, True, True)   # Fixed base left
+model.add_restraint(4, True, True, False)  # Pinned base right
+
+# Loads
+model.add_load_pattern("Wind")
+model.add_point_load(2, "Wind", fx=20, fy=0, mz=0)
+
+model.solve()
+```
+
+### Slotted Connection (Axial Release)
+
+Model a connection that allows axial movement:
+
+```python
+# Member with axial release (can slide axially)
+model.add_releases(
+    member_id=7,
+    pi=True,   # Release axial force at start
+    vi=False,  # Transfer shear
+    mi=False   # Transfer moment
+)
+```
+
+<Warning>
+Releasing both axial force and shear at the same end can create an unstable mechanism. Ensure your releases produce a stable structural system.
+</Warning>
+
+## Understanding Release Effects
+
+### Moment Release Effects
+
+When you release moment at a connection:
+
+- The member develops zero moment at that end
+- The connection can rotate freely
+- Member stiffness is reduced (lower bending stiffness contribution)
+- Moment diagram shows zero moment at the release point
+
+### Shear Release Effects
+
+When you release shear at a connection:
+
+- The member develops zero shear at that end
+- The connection can translate perpendicular to the member axis
+- Member doesn't contribute to lateral stiffness
+
+### Axial Release Effects
+
+When you release axial force at a connection:
+
+- The member develops zero axial force at that end
+- The connection can translate along the member axis
+- Member doesn't resist axial loads
+
+## Validation and Debugging
+
+After adding releases, verify your model:
+
+```python
+# Solve the model
+model.solve("Load Pattern")
+
+# Get member forces at ends
+results = model.get_results("Load Pattern")
+
+# Check that released forces are zero
+member_forces = results.get_member_forces(member_id=1)
+print(f"Start moment: {member_forces.mi}")  # Should be ~0 if mi=True
+print(f"End moment: {member_forces.mj}")    # Should be ~0 if mj=True
+```
+
+<Tip>
+Use the visualization tools to inspect deformed shapes and internal force diagrams. Releases should show as discontinuities in moment or force diagrams.
+</Tip>
+
+## Stability Considerations
+
+<Warning>
+**Critical**: Excessive releases can create unstable mechanisms. Always ensure:
+
+1. The structure has sufficient restraints to prevent rigid body motion
+2. Members with multiple releases don't create unstable conditions
+3. The global stiffness matrix remains positive definite
+
+If the solver fails or produces unrealistic results, check for over-released members.
+</Warning>
+
+## Common Patterns
+
+### Simply Supported Beam
+```python
+model.add_releases(member_id, mi=True, mj=True)
+```
+
+### Cantilever Beam
+```python
+model.add_releases(member_id, mi=False, mj=True)
+```
+
+### Truss Member
+```python
+model.add_releases(member_id, vi=True, mi=True, vj=True, mj=True)
+```
+
+### Continuous Beam Interior Support
+```python
+# Left span
+model.add_releases(left_member_id, mi=True, mj=False)
+# Right span
+model.add_releases(right_member_id, mi=False, mj=True)
+```
+
+## Best Practices
+
+1. **Match physical behavior**: Use releases to represent actual connection details
+2. **Document assumptions**: Keep notes on why specific releases were applied
+3. **Check stability**: Verify the structure is stable after adding releases
+4. **Validate results**: Compare internal forces to hand calculations when possible
+5. **Use symmetry**: Apply symmetric releases when the structure is symmetric
+
+## Related Topics
+
+<CardGroup cols={2}>
+  <Card title="End Length Offsets" icon="ruler-horizontal" href="/advanced/end-offsets">
+    Model rigid end zones at connections
+  </Card>
+  <Card title="Elastic Supports" icon="arrows-up-down" href="/advanced/elastic-supports">
+    Add spring supports to nodes
+  </Card>
+</CardGroup>

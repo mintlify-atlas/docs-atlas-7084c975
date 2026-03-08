@@ -1,0 +1,441 @@
+---
+title: Enumerations
+description: Enum types used throughout milcapy for type-safe parameter specification
+---
+
+Milcapy uses Python enumerations to provide type-safe, readable parameter values. You can use either the enum values or their string equivalents in most API calls.
+
+## BeamTheoriesType
+
+Specifies the beam theory used for frame element formulation.
+
+```python
+from milcapy.utils.types import BeamTheoriesType
+```
+
+### Values
+
+<ParamField path="TIMOSHENKO" type="BeamTheoriesType.TIMOSHENKO">
+  Timoshenko beam theory - Accounts for shear deformation. More accurate for short, deep beams.
+  
+  **String equivalent:** `'TIMOSHENKO'`
+</ParamField>
+
+<ParamField path="EULER_BERNOULLI" type="BeamTheoriesType.EULER_BERNOULLI">
+  Euler-Bernoulli beam theory - Ignores shear deformation. Suitable for slender beams.
+  
+  **String equivalent:** `'EULER_BERNOULLI'`
+</ParamField>
+
+### Usage
+
+```python
+# Using enum
+model.add_member(1, 1, 2, 'Section1', beam_theory=BeamTheoriesType.TIMOSHENKO)
+
+# Using string (equivalent)
+model.add_member(1, 1, 2, 'Section1', beam_theory='TIMOSHENKO')
+```
+
+---
+
+## CoordinateSystemType
+
+Specifies whether to use global or local coordinate systems.
+
+```python
+from milcapy.utils.types import CoordinateSystemType
+```
+
+### Values
+
+<ParamField path="GLOBAL" type="CoordinateSystemType.GLOBAL">
+  Global coordinate system - Fixed reference frame for entire model.
+  
+  **String equivalent:** `'GLOBAL'`
+</ParamField>
+
+<ParamField path="LOCAL" type="CoordinateSystemType.LOCAL">
+  Local coordinate system - Element-specific or node-specific reference frame.
+  
+  **String equivalent:** `'LOCAL'`
+</ParamField>
+
+### Usage
+
+```python
+# Apply load in global coordinates
+model.add_point_load(1, 'Dead', fx=10, CSys=CoordinateSystemType.GLOBAL)
+
+# Apply load in local coordinates
+model.add_point_load(2, 'Dead', fx=10, CSys='LOCAL')
+```
+
+---
+
+## DirectionType
+
+Specifies load direction in global or local coordinate systems.
+
+```python
+from milcapy.utils.types import DirectionType
+```
+
+### Local Directions
+
+<ParamField path="LOCAL_1" type="DirectionType.LOCAL_1">
+  Local axial direction along the member.
+  
+  **String equivalent:** `'LOCAL_1'`
+</ParamField>
+
+<ParamField path="LOCAL_2" type="DirectionType.LOCAL_2">
+  Local shear direction (perpendicular to member axis).
+  
+  **String equivalent:** `'LOCAL_2'`
+</ParamField>
+
+<ParamField path="LOCAL_3" type="DirectionType.LOCAL_3">
+  Local moment direction.
+  
+  **String equivalent:** `'LOCAL_3'`
+</ParamField>
+
+### Global Directions
+
+<ParamField path="X" type="DirectionType.X">
+  Global X direction.
+  
+  **String equivalent:** `'X'`
+</ParamField>
+
+<ParamField path="Y" type="DirectionType.Y">
+  Global Y direction.
+  
+  **String equivalent:** `'Y'`
+</ParamField>
+
+<ParamField path="X_PROJ" type="DirectionType.X_PROJ">
+  Projected in global X direction.
+  
+  **String equivalent:** `'X_PROJ'`
+</ParamField>
+
+<ParamField path="Y_PROJ" type="DirectionType.Y_PROJ">
+  Projected in global Y direction.
+  
+  **String equivalent:** `'Y_PROJ'`
+</ParamField>
+
+<ParamField path="GRAVITY" type="DirectionType.GRAVITY">
+  Gravity direction (typically -Y).
+  
+  **String equivalent:** `'GRAVITY'`
+</ParamField>
+
+<ParamField path="GRAVITY_PROJ" type="DirectionType.GRAVITY_PROJ">
+  Projected gravity direction.
+  
+  **String equivalent:** `'GRAVITY_PROJ'`
+</ParamField>
+
+<ParamField path="MOMENT" type="DirectionType.MOMENT">
+  Moment direction.
+  
+  **String equivalent:** `'MOMENT'`
+</ParamField>
+
+### Usage
+
+```python
+# Distributed load in local shear direction
+model.add_distributed_load(
+    1, 'Dead', 
+    load_start=-10, 
+    load_end=-10,
+    direction=DirectionType.LOCAL_2
+)
+
+# Distributed load in gravity direction
+model.add_distributed_load(
+    2, 'Dead',
+    load_start=-5,
+    load_end=-5, 
+    direction='GRAVITY'
+)
+```
+
+---
+
+## StateType
+
+Specifies the active/inactive state of load patterns.
+
+```python
+from milcapy.utils.types import StateType
+```
+
+### Values
+
+<ParamField path="ACTIVE" type="StateType.ACTIVE">
+  Load pattern is active and will be included in analysis.
+  
+  **String equivalent:** `'ACTIVE'`
+</ParamField>
+
+<ParamField path="INACTIVE" type="StateType.INACTIVE">
+  Load pattern is inactive and will be excluded from analysis.
+  
+  **String equivalent:** `'INACTIVE'`
+</ParamField>
+
+### Usage
+
+```python
+# Create active load pattern
+model.add_load_pattern('Dead', state=StateType.ACTIVE)
+
+# Create inactive pattern (to activate later)
+model.add_load_pattern('Live', state='INACTIVE')
+
+# Change state
+model.set_state_load_pattern('Live', StateType.ACTIVE)
+```
+
+---
+
+## LoadType
+
+Specifies the type of distributed load.
+
+```python
+from milcapy.utils.types import LoadType
+```
+
+### Values
+
+<ParamField path="FORCE" type="LoadType.FORCE">
+  Force per unit length (e.g., kN/m).
+  
+  **String equivalent:** `'FORCE'`
+</ParamField>
+
+<ParamField path="MOMENT" type="LoadType.MOMENT">
+  Moment per unit length (e.g., kN·m/m).
+  
+  **String equivalent:** `'MOMENT'`
+</ParamField>
+
+### Usage
+
+```python
+# Force distributed load
+model.add_distributed_load(
+    1, 'Dead',
+    load_start=-10,
+    load_end=-10,
+    load_type=LoadType.FORCE
+)
+```
+
+---
+
+## FieldType
+
+Specifies field types for membrane/shell element results.
+
+```python
+from milcapy.utils.types import FieldType
+```
+
+### Stress Components
+
+<ParamField path="SX" type="FieldType.SX">
+  Normal stress in X direction.
+  
+  **String equivalent:** `'SX'`
+</ParamField>
+
+<ParamField path="SY" type="FieldType.SY">
+  Normal stress in Y direction.
+  
+  **String equivalent:** `'SY'`
+</ParamField>
+
+<ParamField path="SXY" type="FieldType.SXY">
+  Shear stress in XY plane.
+  
+  **String equivalent:** `'SXY'`
+</ParamField>
+
+### Strain Components
+
+<ParamField path="EX" type="FieldType.EX">
+  Normal strain in X direction.
+  
+  **String equivalent:** `'EX'`
+</ParamField>
+
+<ParamField path="EY" type="FieldType.EY">
+  Normal strain in Y direction.
+  
+  **String equivalent:** `'EY'`
+</ParamField>
+
+<ParamField path="EXY" type="FieldType.EXY">
+  Shear strain in XY plane.
+  
+  **String equivalent:** `'EXY'`
+</ParamField>
+
+### Displacement Components
+
+<ParamField path="UX" type="FieldType.UX">
+  Displacement in X direction.
+  
+  **String equivalent:** `'UX'`
+</ParamField>
+
+<ParamField path="UY" type="FieldType.UY">
+  Displacement in Y direction.
+  
+  **String equivalent:** `'UY'`
+</ParamField>
+
+<ParamField path="UMAG" type="FieldType.UMAG">
+  Displacement magnitude (resultant).
+  
+  **String equivalent:** `'UMAG'`
+</ParamField>
+
+---
+
+## ConstitutiveModelType
+
+Specifies the constitutive model for 2D finite elements.
+
+```python
+from milcapy.utils.types import ConstitutiveModelType
+```
+
+### Values
+
+<ParamField path="PLANE_STRESS" type="ConstitutiveModelType.PLANE_STRESS">
+  Plane stress assumption - Stress in out-of-plane direction is zero. Suitable for thin plates.
+  
+  **String equivalent:** `'PLANE_STRESS'`
+</ParamField>
+
+<ParamField path="PLANE_STRAIN" type="ConstitutiveModelType.PLANE_STRAIN">
+  Plane strain assumption - Strain in out-of-plane direction is zero. Suitable for long structures.
+  
+  **String equivalent:** `'PLANE_STRAIN'`
+</ParamField>
+
+### Usage
+
+```python
+# CST element with plane stress
+model.add_cst(
+    1, 1, 2, 3, 
+    'Shell1',
+    state=ConstitutiveModelType.PLANE_STRESS
+)
+
+# CST element with plane strain
+model.add_cst(
+    2, 4, 5, 6,
+    'Shell1', 
+    state='PLANE_STRAIN'
+)
+```
+
+---
+
+## IntegrationType
+
+Specifies the numerical integration scheme for finite elements.
+
+```python
+from milcapy.utils.types import IntegrationType
+```
+
+### Values
+
+<ParamField path="COMPLETE" type="IntegrationType.COMPLETE">
+  Complete (full) integration - More accurate but can cause locking in some elements.
+  
+  **String equivalent:** `'COMPLETE'`
+</ParamField>
+
+<ParamField path="REDUCED" type="IntegrationType.REDUCED">
+  Reduced integration - Uses fewer integration points to avoid locking.
+  
+  **String equivalent:** `'REDUCED'`
+</ParamField>
+
+### Usage
+
+```python
+# Q8 element with complete integration
+model.add_membrane_q8(
+    1, 1, 2, 3, 4,
+    'Shell1',
+    integration=IntegrationType.COMPLETE
+)
+
+# Q8 element with reduced integration
+model.add_membrane_q8(
+    2, 5, 6, 7, 8,
+    'Shell1',
+    integration='REDUCED'
+)
+```
+
+---
+
+## Example: Using Multiple Enums
+
+```python
+import milcapy as milca
+from milcapy.utils.types import (
+    BeamTheoriesType,
+    CoordinateSystemType,
+    DirectionType,
+    StateType,
+    LoadType,
+    ConstitutiveModelType
+)
+
+model = milca.SystemMilcaModel()
+
+# Create member with Timoshenko theory
+model.add_member(
+    1, 1, 2, 'Beam',
+    beam_theory=BeamTheoriesType.TIMOSHENKO
+)
+
+# Create active load pattern
+model.add_load_pattern(
+    'Dead Load',
+    state=StateType.ACTIVE
+)
+
+# Add distributed load in local coordinates
+model.add_distributed_load(
+    member_id=1,
+    load_pattern_name='Dead Load',
+    load_start=-10,
+    load_end=-10,
+    CSys=CoordinateSystemType.LOCAL,
+    direction=DirectionType.LOCAL_2,
+    load_type=LoadType.FORCE
+)
+
+# Add CST element with plane stress
+model.add_cst(
+    1, 1, 2, 3,
+    'Shell',
+    state=ConstitutiveModelType.PLANE_STRESS
+)
+```

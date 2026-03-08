@@ -1,0 +1,299 @@
+---
+title: 'Materials and Sections'
+description: 'Define material properties and cross-sectional characteristics'
+icon: 'flask'
+---
+
+## Overview
+
+Materials define the physical properties of structural components (elasticity, strength, density), while sections describe the geometric properties of cross-sections (area, moment of inertia). Together, they determine how structural elements behave under load.
+
+## Materials
+
+### Adding a Material
+
+Create a material by specifying its elastic properties:
+
+```python
+material = model.add_material(
+    name="Steel",
+    modulus_elasticity=200e9,  # Young's modulus (Pa)
+    poisson_ratio=0.3,          # Poisson's ratio
+    specific_weight=78500       # Specific weight (N/m³)
+)
+```
+
+### Material Parameters
+
+<Accordion title="Modulus of Elasticity (E)">
+  The material's stiffness, measured in Pascals (Pa). Common values:
+  - Steel: 200 GPa (200e9 Pa)
+  - Concrete: 25-35 GPa
+  - Aluminum: 70 GPa
+</Accordion>
+
+<Accordion title="Poisson's Ratio (ν)">
+  Ratio of transverse strain to axial strain. Must be between -1 and 0.5:
+  - Steel: 0.30
+  - Concrete: 0.15-0.20
+  - Aluminum: 0.33
+</Accordion>
+
+<Accordion title="Specific Weight (γ)">
+  Weight per unit volume (N/m³ or kg/m³). Used for self-weight calculations:
+  - Steel: 78,500 N/m³ (7,850 kg/m³)
+  - Concrete: 24,000 N/m³ (2,400 kg/m³)
+  - Aluminum: 27,000 N/m³ (2,700 kg/m³)
+</Accordion>
+
+### Material Properties
+
+Once created, materials automatically calculate the shear modulus:
+
+```python
+material = model.materials["Steel"]
+
+E = material.E  # Modulus of elasticity
+nu = material.v  # Poisson's ratio
+G = material.G  # Shear modulus (calculated as E / (2 * (1 + ν)))
+gamma = material.g  # Specific weight
+```
+
+### Thermal Expansion Coefficients
+
+Materials also support thermal expansion coefficients:
+
+```python
+material = model.materials["Steel"]
+
+material.alpha = 1.2e-5  # Linear thermal expansion coefficient
+material.beta = 2.4e-5   # Surface thermal expansion coefficient  
+material.gamma = 3.6e-5  # Volumetric thermal expansion coefficient
+```
+
+<Note>
+  The shear modulus `G` is automatically calculated from Young's modulus and Poisson's ratio: `G = E / (2 * (1 + ν))`
+</Note>
+
+## Sections
+
+milcapy provides several predefined section types for different geometric configurations.
+
+### Rectangular Section
+
+The most common section type for beams and columns:
+
+```python
+section = model.add_rectangular_section(
+    name="SEC-30x50",
+    material_name="Concrete",
+    base=0.30,    # Width (m)
+    height=0.50   # Depth (m)
+)
+```
+
+**Properties calculated automatically:**
+- Area: `A = base × height`
+- Moment of inertia: `I = (base × height³) / 12`
+- Shear coefficient: `k = 5/6` (Timoshenko) or `k = 10(1+ν)/(12+11ν)` (Cowper)
+
+### Circular Section
+
+For circular beams or columns:
+
+```python
+section = model.add_circular_section(
+    name="PIPE-200",
+    material_name="Steel",
+    diameter=0.20  # Outer diameter (m)
+)
+```
+
+**Properties calculated automatically:**
+- Area: `A = π × r²`
+- Moment of inertia: `I = π × r⁴ / 4`
+- Shear coefficient: `k = 6/7` (Timoshenko)
+
+### Generic Section
+
+For custom sections with known properties:
+
+```python
+section = model.add_generic_section(
+    name="CUSTOM-1",
+    material_name="Steel",
+    area=0.0085,        # Cross-sectional area (m²)
+    inertia=7.2e-5,     # Moment of inertia (m⁴)
+    k_factor=0.8333     # Shear coefficient
+)
+```
+
+<Tip>
+  Use generic sections when you have pre-calculated section properties from tables or CAD software.
+</Tip>
+
+### Shell Section
+
+For membrane and plate elements:
+
+```python
+section = model.add_shell_section(
+    name="WALL-200",
+    material_name="Concrete",
+    thickness=0.20  # Thickness (m)
+)
+```
+
+## Section Property Modifiers
+
+Modify section properties without changing the base geometry:
+
+```python
+model.set_property_modifiers(
+    section_name="SEC-30x50",
+    axial_area=1.0,       # Modifier for area (default: 1.0)
+    shear_area=1.0,       # Modifier for shear area (default: 1.0)
+    moment_inertia=0.35,  # Reduce stiffness for cracked concrete
+    weight=1.0            # Modifier for self-weight (default: 1.0)
+)
+```
+
+<Accordion title="When to Use Modifiers">
+  **Common use cases:**
+  - **Cracked concrete sections**: Reduce `moment_inertia` to 0.35-0.70
+  - **Composite sections**: Adjust `axial_area` for effective area
+  - **Construction phases**: Modify `weight` for temporary conditions
+  - **Shear deformation**: Adjust `shear_area` for refined analysis
+</Accordion>
+
+## Shear Coefficient Methods
+
+For rectangular and circular sections, you can choose the shear coefficient calculation method:
+
+```python
+from milcapy.utils.types import ShearCoefficientMethodType
+
+# Timoshenko method (default)
+section = model.add_rectangular_section(
+    name="SEC-1",
+    material_name="Concrete",
+    base=0.30,
+    height=0.50
+)
+# Uses k = 5/6 for rectangular, k = 6/7 for circular
+
+# Cowper method (more accurate)
+# k = 10(1 + ν) / (12 + 11ν)
+```
+
+<Note>
+  The shear coefficient affects the shear deformation in Timoshenko beam theory. For Euler-Bernoulli beams, shear deformation is neglected.
+</Note>
+
+## Accessing Section Properties
+
+Retrieve calculated section properties:
+
+```python
+section = model.sections["SEC-30x50"]
+
+# Geometric properties
+A = section.A()   # Area
+I = section.I()   # Moment of inertia
+k = section.k()   # Shear coefficient
+
+# Material properties (from linked material)
+E = section.E()   # Young's modulus
+G = section.G()   # Shear modulus
+v = section.v()   # Poisson's ratio
+g = section.g()   # Specific weight
+```
+
+## Complete Example
+
+<Steps>
+  <Step title="Define materials">
+    ```python
+    # Concrete material
+    model.add_material(
+        name="C30",
+        modulus_elasticity=30e9,
+        poisson_ratio=0.2,
+        specific_weight=24000
+    )
+    
+    # Steel material
+    model.add_material(
+        name="A36",
+        modulus_elasticity=200e9,
+        poisson_ratio=0.3,
+        specific_weight=78500
+    )
+    ```
+  </Step>
+  
+  <Step title="Create sections">
+    ```python
+    # Concrete beam section
+    model.add_rectangular_section(
+        name="BEAM-40x60",
+        material_name="C30",
+        base=0.40,
+        height=0.60
+    )
+    
+    # Steel column section  
+    model.add_circular_section(
+        name="COL-300",
+        material_name="A36",
+        diameter=0.30
+    )
+    
+    # Concrete wall section
+    model.add_shell_section(
+        name="WALL-250",
+        material_name="C30",
+        thickness=0.25
+    )
+    ```
+  </Step>
+  
+  <Step title="Apply modifiers (optional)">
+    ```python
+    # Account for concrete cracking
+    model.set_property_modifiers(
+        section_name="BEAM-40x60",
+        moment_inertia=0.5  # 50% effective stiffness
+    )
+    ```
+  </Step>
+</Steps>
+
+## Best Practices
+
+<Warning>
+  **Material Must Exist**: Always add materials before creating sections that reference them. The model will raise a `ValueError` if the material doesn't exist.
+</Warning>
+
+<Tip>
+  **Consistent Units**: Use consistent units throughout your model. SI units (meters, Newtons, Pascals) are recommended.
+</Tip>
+
+<Tip>
+  **Meaningful Names**: Use descriptive names that indicate dimensions or properties:
+  - `"C30"` for concrete grade
+  - `"BEAM-40x60"` for 40cm × 60cm beam
+  - `"WALL-250"` for 250mm wall thickness
+</Tip>
+
+## Related Concepts
+
+<CardGroup cols={2}>
+  <Card title="System Model" icon="cube" href="/concepts/model">
+    Learn about the main model structure
+  </Card>
+  
+  <Card title="Elements" icon="diagram-project" href="/concepts/nodes-elements">
+    Use sections to create structural elements
+  </Card>
+</CardGroup>

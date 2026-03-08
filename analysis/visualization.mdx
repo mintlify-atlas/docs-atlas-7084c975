@@ -1,0 +1,321 @@
+---
+title: 'Model Visualization'
+description: 'Interactive visualization of structural models and analysis results'
+---
+
+## Overview
+
+Milcapy provides an interactive visualization tool that allows you to view your model geometry, deformed shapes, internal force diagrams, reactions, and more. The visualization is built on matplotlib and offers a rich interactive experience.
+
+## Basic Visualization
+
+The simplest way to visualize your solved model:
+
+```python
+from milcapy import SystemModel
+
+model = SystemModel()
+# ... define and solve model ...
+model.solve()
+
+# Open interactive viewer
+model.show()
+```
+
+This opens an interactive matplotlib window with your model and results.
+
+## Using model_viewer
+
+Alternatively, use the standalone `model_viewer` function:
+
+```python
+from milcapy import SystemModel, model_viewer
+
+model = SystemModel()
+# ... define and solve model ...
+model.solve()
+
+# Open viewer
+model_viewer(model)
+```
+
+<Note>
+  Both `model.show()` and `model_viewer(model)` provide the same interactive visualization interface.
+</Note>
+
+## Visualization Features
+
+The interactive viewer displays:
+
+- **Model geometry** - Nodes, members, trusses, and membrane elements
+- **Supports** - Conventional restraints and elastic supports
+- **Loads** - Point loads and distributed loads
+- **Deformed shapes** - Scaled displacement visualization
+- **Force diagrams** - Axial, shear, and moment diagrams
+- **Reactions** - Support reaction forces and moments
+- **Labels** - Node and element labels
+
+## Customizing Visualization Options
+
+Configure visualization settings through `plotter_options`:
+
+```python
+model = SystemModel()
+# ... build model ...
+
+# Customize plot appearance
+model.plotter_options.figure_size = (12, 8)
+model.plotter_options.dpi = 100
+model.plotter_options.grid = True
+model.plotter_options.plot_style = "seaborn-v0_8-darkgrid"
+
+# Element styling
+model.plotter_options.element_color = "#2c3e50"
+model.plotter_options.element_line_width = 2.0
+model.plotter_options.node_color = "blue"
+model.plotter_options.node_size = 50
+
+# Support styling
+model.plotter_options.support_size = 0.5
+model.plotter_options.support_color = "green"
+
+# Load styling
+model.plotter_options.point_load_color = "red"
+model.plotter_options.point_load_length_arrow = 1.0
+model.plotter_options.distributed_load_color = "orange"
+
+# Deformation scaling
+model.plotter_options.deformation_scale = 10.0
+model.plotter_options.deformation_color = "#e74c3c"
+
+model.solve()
+model.show()
+```
+
+## Visibility Controls
+
+Control what elements are displayed:
+
+```python
+# Show/hide components
+model.plotter_options.UI_show_nodes = True
+model.plotter_options.UI_show_members = True
+model.plotter_options.UI_node_labels = True
+model.plotter_options.UI_member_labels = True
+
+# Show/hide analysis results
+model.plotter_options.UI_load = True          # Show loads
+model.plotter_options.UI_support = True       # Show supports
+model.plotter_options.UI_deformed = True      # Show deformed shape
+model.plotter_options.UI_rigid_deformed = False  # Rigid deformed shape
+model.plotter_options.UI_reactions = True     # Show reactions
+
+# Show/hide diagrams
+model.plotter_options.UI_axial = True         # Axial force diagram
+model.plotter_options.UI_shear = True         # Shear force diagram
+model.plotter_options.UI_moment = True        # Moment diagram
+
+model.show()
+```
+
+## Diagram Styling
+
+Customize internal force diagram appearance:
+
+```python
+# Diagram fill colors
+model.plotter_options.positive_fill_color = "#3498db"
+model.plotter_options.negative_fill_color = "#e74c3c"
+model.plotter_options.positive_fill_alpha = 0.6
+model.plotter_options.negative_fill_alpha = 0.6
+
+# Diagram labels
+model.plotter_options.internal_forces_label = True
+model.plotter_options.label_font_size = 10
+
+# Diagram scaling
+model.plotter_options.axial_scale = {"Dead Load": 0.5}
+model.plotter_options.shear_scale = {"Dead Load": 1.0}
+model.plotter_options.moment_scale = {"Dead Load": 1.5}
+```
+
+## Post-Processing Resolution
+
+Control the number of evaluation points for member diagrams:
+
+```python
+# Set number of points (default is 17)
+model.postprocessing_options.n = 100
+model.postprocessing_options.factor = 1
+
+model.solve()
+model.show()
+```
+
+Higher values provide smoother diagrams but increase computation time.
+
+## Load Pattern Visualization
+
+When you have multiple load patterns, the viewer allows switching between them:
+
+```python
+model.add_load_pattern("Dead Load")
+model.add_point_load(2, "Dead Load", fy=-50)
+
+model.add_load_pattern("Live Load")
+model.add_distributed_load(1, "Live Load", load_start=-10, load_end=-10)
+
+model.solve()
+model.show()  # Use UI to switch between load patterns
+```
+
+## Advanced Plotting Options
+
+### Background Color
+
+```python
+model.plotter_options.UI_background_color = "#ecf0f1"
+```
+
+### End Length Offsets (Rigid Arms)
+
+```python
+model.plotter_options.end_length_offset_color = "purple"
+model.plotter_options.end_length_offset_line_width = 2.0
+```
+
+### Elastic Supports
+
+```python
+model.plotter_options.elastic_support_size = 0.3
+```
+
+### Tolerance and Precision
+
+```python
+model.plotter_options.tol = 1e-6      # Tolerance for zero values
+model.plotter_options.decimals = 4    # Decimal places for rounding
+```
+
+## Complete Example
+
+```python
+from milcapy import SystemModel, BeamTheoriesType, model_viewer
+
+model = SystemModel()
+
+# Define model
+model.add_material("concrete", modulus_elasticity=2.5e6, poisson_ratio=0.2)
+model.add_rectangular_section("beam", "concrete", base=0.3, height=0.5)
+
+model.add_node(1, 0, 0)
+model.add_node(2, 5, 0)
+model.add_node(3, 10, 0)
+model.add_node(4, 5, 4)
+
+model.add_member(1, 1, 2, "beam", BeamTheoriesType.TIMOSHENKO)
+model.add_member(2, 2, 3, "beam", BeamTheoriesType.TIMOSHENKO)
+model.add_member(3, 2, 4, "beam", BeamTheoriesType.TIMOSHENKO)
+
+model.add_restraint(1, ux=True, uy=True, rz=True)
+model.add_restraint(3, ux=False, uy=True, rz=False)
+
+model.add_load_pattern("Dead Load")
+model.add_point_load(4, "Dead Load", fy=-100)
+model.add_distributed_load(1, "Dead Load", load_start=-15, load_end=-15)
+model.add_distributed_load(2, "Dead Load", load_start=-15, load_end=-15)
+
+# Customize visualization
+model.plotter_options.figure_size = (14, 10)
+model.plotter_options.dpi = 120
+model.plotter_options.grid = True
+model.plotter_options.element_line_width = 2.5
+model.plotter_options.node_size = 80
+
+# Diagram settings
+model.plotter_options.UI_axial = True
+model.plotter_options.UI_shear = True
+model.plotter_options.UI_moment = True
+model.plotter_options.UI_deformed = True
+model.plotter_options.UI_reactions = True
+
+# High resolution diagrams
+model.postprocessing_options.n = 150
+
+# Solve and visualize
+model.solve()
+model_viewer(model)
+```
+
+## Plotter Class (Advanced)
+
+For programmatic control, access the `Plotter` class directly:
+
+```python
+model.solve()
+
+# Initialize plotter
+from milcapy.plotter.plotter import Plotter
+plotter = Plotter(model)
+
+# Initialize visualization
+plotter.initialize_plot()
+
+# Update specific visualizations
+plotter.update_deformed(visibility=True)
+plotter.update_axial_force(visibility=True)
+plotter.update_reactions(visibility=True)
+
+# Show the plot
+import matplotlib.pyplot as plt
+plt.show()
+```
+
+## Export Visualizations
+
+Save visualizations programmatically:
+
+```python
+model.solve()
+model.show()
+
+# From the matplotlib window, use the save button
+# Or programmatically:
+import matplotlib.pyplot as plt
+plt.savefig("structural_model.png", dpi=300, bbox_inches="tight")
+```
+
+## Interactive Features
+
+The visualization window provides:
+
+- **Pan and Zoom** - Navigate the plot using mouse controls
+- **Load Pattern Selection** - Switch between different load cases
+- **Member Selection** - Click members to view detailed diagrams
+- **Toggle Visibility** - Show/hide different visualization layers
+- **Scaling Controls** - Adjust deformation and diagram scales
+
+## Tips for Better Visualizations
+
+<Tip>
+  **Use high DPI** for clearer plots: `model.plotter_options.dpi = 150`
+</Tip>
+
+<Tip>
+  **Increase post-processing points** for smoother diagrams: `model.postprocessing_options.n = 200`
+</Tip>
+
+<Tip>
+  **Adjust deformation scale** to see displacements clearly: `model.plotter_options.deformation_scale = 50.0`
+</Tip>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Results Extraction" icon="chart-line" href="/analysis/results">
+    Extract numerical results from your analysis
+  </Card>
+  <Card title="Load Patterns" icon="weight-hanging" href="/concepts/load-patterns">
+    Learn about creating and managing load patterns
+  </Card>
+</CardGroup>

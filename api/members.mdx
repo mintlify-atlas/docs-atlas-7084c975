@@ -1,0 +1,194 @@
+---
+title: 'Member/Beam Elements'
+description: 'Add frame and beam elements to the structural model'
+---
+
+Milcapy provides several methods to add frame and beam elements using different beam theories.
+
+## add_member()
+
+Add a structural member (frame element) to the model with configurable beam theory.
+
+### Syntax
+
+```python
+model.add_member(id, node_i_id, node_j_id, section_name, beam_theory='TIMOSHENKO')
+```
+
+### Parameters
+
+<ParamField path="id" type="int" required>
+  Unique identifier for the member element.
+</ParamField>
+
+<ParamField path="node_i_id" type="int" required>
+  ID of the initial (start) node.
+</ParamField>
+
+<ParamField path="node_j_id" type="int" required>
+  ID of the final (end) node.
+</ParamField>
+
+<ParamField path="section_name" type="str" required>
+  Name of the section previously defined with `add_rectangular_section()`, `add_circular_section()`, or `add_generic_section()`.
+</ParamField>
+
+<ParamField path="beam_theory" type="str | BeamTheoriesType" default="'TIMOSHENKO'">
+  Beam theory to use for the element. Available options:
+  - `'TIMOSHENKO'` - Timoshenko beam theory (accounts for shear deformation)
+  - `'EULER_BERNOULLI'` - Euler-Bernoulli beam theory (ignores shear deformation)
+</ParamField>
+
+### Returns
+
+Returns a `Member` object representing the created frame element.
+
+### Example
+
+```python
+import milcapy as milca
+
+model = milca.SystemMilcaModel()
+
+# Add material and section
+model.add_material('steel', modulus_elasticity=200e9, poisson_ratio=0.3)
+model.add_rectangular_section('sec1', 'steel', base=0.3, height=0.5)
+
+# Add nodes
+model.add_node(1, 0.0, 0.0)
+model.add_node(2, 5.0, 0.0)
+
+# Add member with default Timoshenko theory
+model.add_member(1, 1, 2, 'sec1')
+
+# Add member with Euler-Bernoulli theory
+model.add_member(2, 2, 3, 'sec1', beam_theory='EULER_BERNOULLI')
+```
+
+---
+
+## add_elastic_timoshenko_beam()
+
+Add a Timoshenko beam element with axial rigidity to the model.
+
+### Syntax
+
+```python
+model.add_elastic_timoshenko_beam(id, node_i_id, node_j_id, section_name)
+```
+
+### Parameters
+
+<ParamField path="id" type="int" required>
+  Unique identifier for the beam element.
+</ParamField>
+
+<ParamField path="node_i_id" type="int" required>
+  ID of the initial (start) node.
+</ParamField>
+
+<ParamField path="node_j_id" type="int" required>
+  ID of the final (end) node.
+</ParamField>
+
+<ParamField path="section_name" type="str" required>
+  Name of the section previously defined.
+</ParamField>
+
+### Returns
+
+Returns a `Member` object with Timoshenko beam theory.
+
+### Example
+
+```python
+import milcapy as milca
+
+model = milca.SystemMilcaModel()
+
+# Add material and section
+model.add_material('steel', modulus_elasticity=200e9, poisson_ratio=0.3)
+model.add_rectangular_section('beam_sec', 'steel', base=0.3, height=0.5)
+
+# Add nodes
+model.add_node(1, 0.0, 0.0)
+model.add_node(2, 6.0, 0.0)
+
+# Add Timoshenko beam
+model.add_elastic_timoshenko_beam(1, 1, 2, 'beam_sec')
+```
+
+---
+
+## add_elastic_euler_bernoulli_beam()
+
+Add an Euler-Bernoulli beam element with axial rigidity to the model.
+
+### Syntax
+
+```python
+model.add_elastic_euler_bernoulli_beam(id, node_i_id, node_j_id, section_name)
+```
+
+### Parameters
+
+<ParamField path="id" type="int" required>
+  Unique identifier for the beam element.
+</ParamField>
+
+<ParamField path="node_i_id" type="int" required>
+  ID of the initial (start) node.
+</ParamField>
+
+<ParamField path="node_j_id" type="int" required>
+  ID of the final (end) node.
+</ParamField>
+
+<ParamField path="section_name" type="str" required>
+  Name of the section previously defined.
+</ParamField>
+
+### Returns
+
+Returns a `Member` object with Euler-Bernoulli beam theory.
+
+### Example
+
+```python
+import milcapy as milca
+
+model = milca.SystemMilcaModel()
+
+# Add material and section
+model.add_material('concrete', modulus_elasticity=25e9, poisson_ratio=0.2)
+model.add_rectangular_section('beam_sec', 'concrete', base=0.25, height=0.4)
+
+# Add nodes
+model.add_node(1, 0.0, 0.0)
+model.add_node(2, 4.0, 0.0)
+
+# Add Euler-Bernoulli beam
+model.add_elastic_euler_bernoulli_beam(1, 1, 2, 'beam_sec')
+```
+
+---
+
+## Beam Theory Comparison
+
+<CardGroup cols={2}>
+  <Card title="Timoshenko Beam" icon="wave-square">
+    Accounts for shear deformation. More accurate for short, thick beams and high-frequency vibrations.
+  </Card>
+  <Card title="Euler-Bernoulli Beam" icon="arrow-right-long">
+    Ignores shear deformation. Suitable for long, slender beams where shear effects are negligible.
+  </Card>
+</CardGroup>
+
+<Note>
+  All three methods create frame elements with 3 degrees of freedom per node (ux, uy, rz). The choice of method depends on the desired beam theory and code organization preferences.
+</Note>
+
+## Related
+
+- [add_node()](/api/nodes) - Add nodes to the model
+- [add_truss()](/api/trusses) - Add truss elements

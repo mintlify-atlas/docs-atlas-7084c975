@@ -1,0 +1,174 @@
+---
+title: Introduction
+description: Python library for 2D structural analysis of frames, trusses, and finite element membranes
+---
+
+<div className="relative overflow-hidden rounded-xl border border-[#e0e0e0] bg-white p-12 mb-8" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+  <div className="mx-auto max-w-4xl">
+    <div className="flex items-center gap-4 mb-6">
+      <img src="/logo.png" alt="milcapy" className="h-16 w-16" />
+      <h1 className="text-5xl font-bold text-[#1a1a1a] m-0" style={{ fontFamily: 'Inter' }}>milcapy</h1>
+    </div>
+    <p className="text-xl text-[#1a1a1a] mb-8" style={{ fontFamily: 'Inter' }}>
+      Python library for 2D structural analysis of frames, trusses, and finite element membranes
+    </p>
+    <div className="flex gap-4">
+      <a 
+        href="/quickstart" 
+        className="inline-block px-6 py-3 rounded-md font-semibold text-[#1a1a1a]"
+        style={{ 
+          backgroundColor: '#94cb04',
+          fontFamily: 'Inter',
+          textDecoration: 'none'
+        }}
+      >
+        Get Started
+      </a>
+      <a 
+        href="https://github.com/amachacca/milcapy" 
+        className="inline-block px-6 py-3 rounded-md font-semibold text-[#1a1a1a] border border-[#e0e0e0]"
+        style={{ 
+          backgroundColor: '#e6e6e6',
+          fontFamily: 'Inter',
+          textDecoration: 'none'
+        }}
+      >
+        View on GitHub
+      </a>
+    </div>
+  </div>
+</div>
+
+## What is milcapy?
+
+milcapy is a comprehensive Python library for structural analysis of 2D frames and finite element membranes. It implements the **direct stiffness method** for frames and trusses, and the **finite element method** for membrane analysis, with closed-form solutions for 1D elements.
+
+The library incorporates advanced concepts from **matrix structural analysis** and supports multiple beam theories and membrane element types.
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Frame & Truss Analysis" icon="border-all">
+    Analyze 2D frames and trusses with Timoshenko and Euler-Bernoulli beam theories
+  </Card>
+  <Card title="Finite Element Membranes" icon="grid">
+    Multiple membrane elements: CST, Q4, Q6, Q6i, and Q8 with plane stress/strain
+  </Card>
+  <Card title="Advanced Features" icon="sliders">
+    End offsets (rigid arms), releases, elastic supports, and local node axes
+  </Card>
+  <Card title="Interactive Visualization" icon="chart-line">
+    Built-in model viewer with deformation plots, force diagrams, and results
+  </Card>
+</CardGroup>
+
+## Supported Elements
+
+milcapy supports a comprehensive range of structural elements:
+
+### 1D Elements
+- **Beams**: Timoshenko and Euler-Bernoulli beam theories
+- **Trusses**: Axial force members
+
+### 2D Membrane Elements
+- **CST**: Constant Strain Triangle (3 nodes, 2 DOF per node)
+- **Q4**: Quadrilateral with 4 nodes and 2 DOF per node
+- **Q6**: Quadrilateral with 4 nodes and 3 DOF per node (includes drilling DOF)
+- **Q6i**: Rectangular element with 4 nodes, 2 DOF per node, and incompatible modes
+- **Q8**: Quadrilateral with 8 nodes (4 mid-side nodes condensed), 2 DOF per node
+
+## Element Convergence
+
+The library includes highly accurate finite element formulations. Below is a convergence study for a cantilever beam (2m length, 0.6m × 0.4m cross-section, E=2×10⁶, ν=0.2, 20 tonf tip load):
+
+<img src="https://raw.githubusercontent.com/amachacca/milcapy/main/docs/assets/convergencia_membranas.png" alt="Element convergence study" />
+
+<Note>
+The Q8 element shows excellent convergence with a single element, while Q4 requires mesh refinement for accurate results.
+</Note>
+
+## Quick Example
+
+```python
+from milcapy import SystemModel, BeamTheoriesType
+
+# Create model
+model = SystemModel()
+
+# Define material and section
+model.add_material("concrete", modulus_elasticity=2.1e6, poisson_ratio=0.2)
+model.add_rectangular_section("beam", "concrete", base=0.3, height=0.5)
+
+# Add nodes
+model.add_node(1, 0, 0)
+model.add_node(2, 5, 0)
+
+# Add member
+model.add_member(1, 1, 2, "beam", BeamTheoriesType.TIMOSHENKO)
+
+# Apply boundary conditions
+model.add_restraint(1, True, True, True)
+model.add_restraint(2, False, True, False)
+
+# Add loads
+model.add_load_pattern("Live Load")
+model.add_point_load(2, "Live Load", fx=0, fy=-100, mz=0)
+
+# Solve
+model.solve()
+
+# Get results
+results = model.get_results("Live Load")
+displacements = results.get_node_displacements(2)
+print(f"Node 2 displacement: {displacements}")
+
+# Visualize
+model.show()
+```
+
+## Installation
+
+Install milcapy using pip:
+
+<CodeGroup>
+
+```bash pip
+pip install milcapy
+```
+
+```bash conda
+conda install -c conda-forge milcapy
+```
+
+</CodeGroup>
+
+## Requirements
+
+- Python ≥ 3.10
+- NumPy
+- Matplotlib
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Get milcapy installed on your system
+  </Card>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Build your first structural model
+  </Card>
+  <Card title="Core Concepts" icon="book" href="/concepts/model">
+    Learn the fundamental concepts
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/system-model">
+    Explore the complete API
+  </Card>
+</CardGroup>
+
+## About
+
+milcapy is developed by **Amilcar Machacca Mayo**.
+
+- GitHub: [amachacca](https://github.com/amachacca)
+- Repository: [milcapy](https://github.com/amachacca/milcapy)
+- License: MIT

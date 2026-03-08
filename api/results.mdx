@@ -1,0 +1,409 @@
+---
+title: Results
+description: Results class and methods for accessing analysis results in milcapy
+---
+
+The `Results` class stores all analysis results for a single load pattern, including displacements, reactions, and internal forces at the model, node, and member levels.
+
+## Getting Results
+
+After solving your model, access results using `get_results()`:
+
+```python
+model.solve()
+results = model.get_results('Dead Load')
+```
+
+---
+
+## Model-Level Results
+
+Get global results for the entire model.
+
+### get_model_displacements()
+
+Returns the global displacement vector for all nodes.
+
+```python
+displacements = results.get_model_displacements()
+```
+
+<ResponseField name="displacements" type="np.ndarray">
+  1D array containing all nodal displacements `[ux1, uy1, rz1, ux2, uy2, rz2, ...]`
+  
+  For n nodes, the array has length 3n with displacements ordered by node ID.
+</ResponseField>
+
+### get_model_reactions()
+
+Returns the global reaction vector for all nodes.
+
+```python
+reactions = results.get_model_reactions()
+```
+
+<ResponseField name="reactions" type="np.ndarray">
+  1D array containing all nodal reactions `[fx1, fy1, mz1, fx2, fy2, mz2, ...]`
+  
+  For n nodes, the array has length 3n with reactions ordered by node ID. Non-zero values appear only at restrained degrees of freedom.
+</ResponseField>
+
+---
+
+## Node-Level Results
+
+Get results for individual nodes.
+
+### get_node_displacements()
+
+Returns displacements for a specific node.
+
+```python
+node_disp = results.get_node_displacements(node_id=1)
+```
+
+#### Parameters
+
+<ParamField path="node_id" type="int" required>
+  ID of the node
+</ParamField>
+
+<ResponseField name="displacement" type="np.ndarray">
+  Array of shape (3,) containing `[ux, uy, rz]` for the node
+</ResponseField>
+
+### get_node_reactions()
+
+Returns reactions for a specific node.
+
+```python
+node_reac = results.get_node_reactions(node_id=1)
+```
+
+#### Parameters
+
+<ParamField path="node_id" type="int" required>
+  ID of the node
+</ParamField>
+
+<ResponseField name="reaction" type="np.ndarray">
+  Array of shape (3,) containing `[fx, fy, mz]` for the node. Non-zero only at restrained DOFs.
+</ResponseField>
+
+---
+
+## Member-Level Results
+
+Get detailed results along the length of members.
+
+### get_member_displacements()
+
+Returns end displacements for a member.
+
+```python
+member_disp = results.get_member_displacements(member_id=1)
+```
+
+#### Parameters
+
+<ParamField path="member_id" type="int" required>
+  ID of the member
+</ParamField>
+
+<ResponseField name="displacements" type="np.ndarray">
+  Array of shape (6,) containing `[uxi, uyi, rzi, uxj, uyj, rzj]` at member ends
+</ResponseField>
+
+### get_member_internal_forces()
+
+Returns end forces for a member.
+
+```python
+forces = results.get_member_internal_forces(member_id=1)
+```
+
+#### Parameters
+
+<ParamField path="member_id" type="int" required>
+  ID of the member
+</ParamField>
+
+<ResponseField name="internal_forces" type="np.ndarray">
+  Array of shape (6,) containing `[Ni, Vi, Mi, Nj, Vj, Mj]` at member ends
+  - N = axial force
+  - V = shear force  
+  - M = bending moment
+</ResponseField>
+
+### get_member_x_val()
+
+Returns the local x-coordinates along the member where results are computed.
+
+```python
+x_values = results.get_member_x_val(member_id=1)
+```
+
+#### Parameters
+
+<ParamField path="member_id" type="int" required>
+  ID of the member
+</ParamField>
+
+<ResponseField name="x_val" type="np.ndarray">
+  Array of local x-coordinates along the member length
+</ResponseField>
+
+### get_member_axial_force()
+
+Returns axial force diagram along the member.
+
+```python
+axial = results.get_member_axial_force(member_id=1)
+```
+
+#### Parameters
+
+<ParamField path="member_id" type="int" required>
+  ID of the member
+</ParamField>
+
+<ResponseField name="axial_force" type="np.ndarray">
+  Array of axial force values along the member
+</ResponseField>
+
+### get_member_shear_force()
+
+Returns shear force diagram along the member.
+
+```python
+shear = results.get_member_shear_force(member_id=1)
+```
+
+#### Parameters
+
+<ParamField path="member_id" type="int" required>
+  ID of the member
+</ParamField>
+
+<ResponseField name="shear_force" type="np.ndarray">
+  Array of shear force values along the member
+</ResponseField>
+
+### get_member_bending_moment()
+
+Returns bending moment diagram along the member.
+
+```python
+moment = results.get_member_bending_moment(member_id=1)
+```
+
+#### Parameters
+
+<ParamField path="member_id" type="int" required>
+  ID of the member
+</ParamField>
+
+<ResponseField name="bending_moment" type="np.ndarray">
+  Array of bending moment values along the member
+</ResponseField>
+
+### get_member_deflection()
+
+Returns transverse deflection along the member.
+
+```python
+deflection = results.get_member_deflection(member_id=1)
+```
+
+#### Parameters
+
+<ParamField path="member_id" type="int" required>
+  ID of the member
+</ParamField>
+
+<ResponseField name="deflection" type="np.ndarray">
+  Array of transverse deflection values along the member
+</ResponseField>
+
+### get_member_slope()
+
+Returns rotation (slope) along the member.
+
+```python
+slope = results.get_member_slope(member_id=1)
+```
+
+#### Parameters
+
+<ParamField path="member_id" type="int" required>
+  ID of the member
+</ParamField>
+
+<ResponseField name="slope" type="np.ndarray">
+  Array of rotation values along the member
+</ResponseField>
+
+### get_member_axial_displacement()
+
+Returns axial displacement along the member.
+
+```python
+axial_disp = results.get_member_axial_displacement(member_id=1)
+```
+
+#### Parameters
+
+<ParamField path="member_id" type="int" required>
+  ID of the member
+</ParamField>
+
+<ResponseField name="axial_displacement" type="np.ndarray">
+  Array of axial displacement values along the member
+</ResponseField>
+
+---
+
+## CST (Triangle) Element Results
+
+Get results for Constant Strain Triangle finite elements.
+
+### get_cst_displacements()
+
+```python
+cst_disp = results.get_cst_displacements(cst_id=1)
+```
+
+#### Parameters
+
+<ParamField path="cst_id" type="int" required>
+  ID of the CST element
+</ParamField>
+
+<ResponseField name="displacements" type="np.ndarray">
+  Nodal displacements for the CST element
+</ResponseField>
+
+### get_cst_strains()
+
+```python
+strains = results.get_cst_strains(cst_id=1)
+```
+
+#### Parameters
+
+<ParamField path="cst_id" type="int" required>
+  ID of the CST element
+</ParamField>
+
+<ResponseField name="strains" type="np.ndarray">
+  Strain values for the CST element
+</ResponseField>
+
+### get_cst_stresses()
+
+```python
+stresses = results.get_cst_stresses(cst_id=1)
+```
+
+#### Parameters
+
+<ParamField path="cst_id" type="int" required>
+  ID of the CST element
+</ParamField>
+
+<ResponseField name="stresses" type="np.ndarray">
+  Stress values for the CST element
+</ResponseField>
+
+---
+
+## Membrane Q6 Element Results
+
+Get results for 6-DOF quadrilateral membrane elements.
+
+### get_membrane_q3dof_displacements()
+
+```python
+q6_disp = results.get_membrane_q3dof_displacements(membrane_q3dof_id=1)
+```
+
+#### Parameters
+
+<ParamField path="membrane_q3dof_id" type="int" required>
+  ID of the membrane Q6 element (3 DOF per node)
+</ParamField>
+
+<ResponseField name="displacements" type="np.ndarray">
+  Nodal displacements for the membrane element
+</ResponseField>
+
+---
+
+## Membrane Q6i Element Results
+
+Get results for membrane elements with incompatible modes.
+
+### get_membrane_q2dof_displacements()
+
+```python
+q6i_disp = results.get_membrane_q2dof_displacements(membrane_q2dof_id=1)
+```
+
+#### Parameters
+
+<ParamField path="membrane_q2dof_id" type="int" required>
+  ID of the membrane Q6i element (2 DOF per node)
+</ParamField>
+
+<ResponseField name="displacements" type="np.ndarray">
+  Nodal displacements for the membrane element
+</ResponseField>
+
+---
+
+## Example Usage
+
+```python
+import milcapy as milca
+import numpy as np
+
+# Solve model
+model.solve()
+results = model.get_results('Dead Load')
+
+# Get model-level results
+all_displacements = results.get_model_displacements()
+all_reactions = results.get_model_reactions()
+
+print(f"Max displacement: {np.max(np.abs(all_displacements))}")
+print(f"Total reaction: {np.sum(all_reactions[1::3])}")
+
+# Get node results
+node_2_disp = results.get_node_displacements(2)
+print(f"Node 2 displacement: ux={node_2_disp[0]:.4f}, uy={node_2_disp[1]:.4f}")
+
+node_1_reac = results.get_node_reactions(1)
+print(f"Node 1 reactions: Fx={node_1_reac[0]:.2f}, Fy={node_1_reac[1]:.2f}")
+
+# Get member results
+x_coords = results.get_member_x_val(1)
+moments = results.get_member_bending_moment(1)
+shears = results.get_member_shear_force(1)
+deflections = results.get_member_deflection(1)
+
+max_moment = np.max(np.abs(moments))
+max_deflection = np.max(np.abs(deflections))
+
+print(f"Member 1 - Max moment: {max_moment:.2f}, Max deflection: {max_deflection:.4f}")
+
+# Plot moment diagram
+import matplotlib.pyplot as plt
+
+plt.figure(figsize=(10, 4))
+plt.plot(x_coords, moments)
+plt.xlabel('Position along member')
+plt.ylabel('Bending Moment')
+plt.title('Bending Moment Diagram')
+plt.grid(True)
+plt.show()
+```

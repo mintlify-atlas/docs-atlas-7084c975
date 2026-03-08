@@ -1,0 +1,268 @@
+---
+title: "model_viewer()"
+description: "Interactive visualization function for structural models"
+---
+
+## Overview
+
+The `model_viewer()` function launches an interactive graphical interface to visualize structural models, including geometry, loads, deformed shapes, and internal force diagrams.
+
+## Function Signature
+
+```python
+from milcapy import model_viewer
+
+model_viewer(model: SystemModel) -> None
+```
+
+## Parameters
+
+<ParamField path="model" type="SystemModel" required>
+  The structural model to visualize. The model must have been solved (analyzed) before calling this function.
+</ParamField>
+
+## Description
+
+The `model_viewer()` function provides an interactive window for exploring structural analysis results. It is equivalent to calling `model.show()` on a SystemModel instance.
+
+### Features
+
+The model viewer provides:
+
+- **Model Geometry**: Displays nodes, members, trusses, and finite elements
+- **Support Visualization**: Shows restraints and boundary conditions
+- **Load Display**: Visualizes point loads and distributed loads
+- **Deformed Shape**: Shows displacement magnification with customizable scale
+- **Internal Forces**: Displays axial force, shear force, and bending moment diagrams
+- **Reactions**: Shows support reactions
+- **Interactive Controls**: Pan, zoom, and toggle display options
+- **Multiple Load Patterns**: Switch between different load cases
+
+## Usage
+
+### Basic Usage
+
+```python
+from milcapy import SystemModel, model_viewer, BeamTheoriesType
+
+# Create and solve model
+model = SystemModel()
+
+# Define materials and sections
+model.add_material("steel", modulus_elasticity=2.0e5, poisson_ratio=0.3)
+model.add_rectangular_section("beam", "steel", base=0.3, height=0.4)
+
+# Build model
+model.add_node(1, 0, 0)
+model.add_node(2, 5, 0)
+model.add_member(1, 1, 2, "beam", BeamTheoriesType.TIMOSHENKO)
+
+# Apply boundary conditions and loads
+model.add_restraint(1, True, True, True)
+model.add_restraint(2, False, True, False)
+
+model.add_load_pattern("Live Load")
+model.add_point_load(2, "Live Load", fy=-100)
+
+# Solve the model
+model.solve()
+
+# Launch viewer
+model_viewer(model)
+```
+
+### Alternative: Using model.show()
+
+```python
+# These are equivalent
+model_viewer(model)
+model.show()
+```
+
+## Requirements
+
+<Warning>
+  The model **must be solved** before calling `model_viewer()`. If the model has not been analyzed, the function will print a warning and return without opening the viewer.
+</Warning>
+
+```python
+# This will fail - model not solved
+model = SystemModel()
+model.add_node(1, 0, 0)
+model_viewer(model)  # Warning: No analyzed load patterns
+
+# Correct usage
+model = SystemModel()
+model.add_node(1, 0, 0)
+model.add_load_pattern("Load")
+model.solve()  # Must solve first
+model_viewer(model)  # Opens viewer successfully
+```
+
+## Viewer Interface
+
+The interactive viewer window provides several controls:
+
+### Display Options
+
+- **Nodes**: Toggle node visibility and labels
+- **Members**: Toggle member visibility and labels
+- **Supports**: Show/hide support symbols
+- **Loads**: Display point and distributed loads
+- **Deformed Shape**: Show displaced configuration
+- **Internal Forces**: Display force diagrams
+
+### Load Pattern Selection
+
+Switch between different load patterns to compare results:
+
+```python
+model.add_load_pattern("Dead Load")
+model.add_load_pattern("Live Load")
+model.add_load_pattern("Wind Load")
+
+model.solve()
+
+# Viewer allows switching between all three load patterns
+model_viewer(model)
+```
+
+### Deformation Scale
+
+The viewer automatically scales deformations for visibility. You can adjust the scale factor interactively to exaggerate or minimize displacements.
+
+## Examples
+
+### Viewing a Simple Frame
+
+```python
+from milcapy import SystemModel, model_viewer, BeamTheoriesType
+
+model = SystemModel()
+
+# Material and section
+model.add_material("concrete", 2.1e6, 0.2)
+model.add_rectangular_section("col", "concrete", 0.3, 0.3)
+
+# Frame nodes
+model.add_node(1, 0, 0)
+model.add_node(2, 0, 3)
+model.add_node(3, 4, 3)
+model.add_node(4, 4, 0)
+
+# Members
+model.add_member(1, 1, 2, "col", BeamTheoriesType.TIMOSHENKO)
+model.add_member(2, 2, 3, "col", BeamTheoriesType.TIMOSHENKO)
+model.add_member(3, 3, 4, "col", BeamTheoriesType.TIMOSHENKO)
+
+# Supports
+model.add_restraint(1, True, True, True)
+model.add_restraint(4, True, True, True)
+
+# Loads
+model.add_load_pattern("Lateral")
+model.add_point_load(2, "Lateral", fx=50)
+
+# Solve and view
+model.solve()
+model_viewer(model)
+```
+
+### Viewing Membrane Elements
+
+```python
+from milcapy import SystemModel, model_viewer, ConstitutiveModelType
+
+model = SystemModel()
+
+# Material and shell section
+model.add_material("concrete", 2.1e6, 0.2)
+model.add_shell_section("wall", "concrete", thickness=0.2)
+
+# Create mesh nodes
+model.add_node(1, 0, 0)
+model.add_node(2, 1, 0)
+model.add_node(3, 1, 1)
+model.add_node(4, 0, 1)
+
+# Add membrane element
+model.add_membrane_q6i(
+    id=1,
+    node_i_id=1,
+    node_j_id=2,
+    node_k_id=3,
+    node_l_id=4,
+    section_name="wall",
+    state=ConstitutiveModelType.PLANE_STRESS
+)
+
+# Supports and loads
+model.add_restraint(1, True, True, False)
+model.add_restraint(2, True, True, False)
+
+model.add_load_pattern("Pressure")
+model.add_point_load(3, "Pressure", fx=100)
+model.add_point_load(4, "Pressure", fx=100)
+
+# Solve and view
+model.solve()
+model_viewer(model)
+```
+
+### Comparing Multiple Load Cases
+
+```python
+from milcapy import SystemModel, model_viewer, BeamTheoriesType
+
+model = SystemModel()
+
+model.add_material("steel", 2.0e5, 0.3)
+model.add_rectangular_section("beam", "steel", 0.2, 0.3)
+
+model.add_node(1, 0, 0)
+model.add_node(2, 6, 0)
+model.add_member(1, 1, 2, "beam", BeamTheoriesType.TIMOSHENKO)
+
+model.add_restraint(1, True, True, True)
+model.add_restraint(2, False, True, False)
+
+# Multiple load patterns
+model.add_load_pattern("Dead Load", self_weight_multiplier=1.0)
+
+model.add_load_pattern("Live Load")
+model.add_distributed_load(1, "Live Load", -20, -20)
+
+model.add_load_pattern("Point Load")
+model.add_point_load(2, "Point Load", fy=-50)
+
+# Solve all patterns
+model.solve()
+
+# Viewer allows switching between Dead, Live, and Point Load cases
+model_viewer(model)
+```
+
+## Return Value
+
+<ResponseField name="None" type="None">
+  The function does not return a value. It opens an interactive window that blocks execution until closed.
+</ResponseField>
+
+## Notes
+
+<Note>
+  - The viewer window is **modal** and will block Python execution until closed
+  - Multiple load patterns can be viewed by switching between them in the interface
+  - The viewer automatically calculates appropriate scaling for deformations
+  - Use the pan and zoom tools to explore large models
+</Note>
+
+<Tip>
+  For automated plotting or non-interactive visualization, use `model.plot_model()` instead, which creates a matplotlib figure that can be saved to a file.
+</Tip>
+
+## See Also
+
+- [SystemModel.show()](/api/system-model#show) - Equivalent method on SystemModel
+- [SystemModel.plot_model()](/api/system-model#plot_model) - Static plotting function
+- [SystemModel](/api/system-model) - Main model class

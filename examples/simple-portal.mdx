@@ -1,0 +1,335 @@
+---
+title: "Simple Portal Frame"
+description: "Learn how to model and analyze a 2D portal frame structure with columns, beams, and trusses"
+---
+
+This example demonstrates how to create a simple portal frame structure using milcapy. You'll learn how to define materials, sections, nodes, members, restraints, and loads to perform a complete structural analysis.
+
+## Overview
+
+The portal frame consists of:
+- Two inclined columns (walls) at the base
+- Beam members forming the frame structure
+- Truss elements for diagonal bracing
+- Various advanced features including local axis definitions, elastic supports, end offsets, and member releases
+
+## Complete Example
+
+<Steps>
+
+<Step title="Import the library">
+Start by importing the necessary modules from milcapy:
+
+```python
+from milcapy import SystemModel, BeamTheoriesType, model_viewer
+```
+</Step>
+
+<Step title="Create the model and define materials">
+Initialize the structural model and define the concrete material:
+
+```python
+model = SystemModel()
+
+model.add_material(
+    name="concreto", 
+    modulus_elasticity=2.1e6, 
+    poisson_ratio=0.2
+)
+```
+
+The material properties are defined in units of tonf/m².
+</Step>
+
+<Step title="Define cross-sections">
+Create rectangular sections for the different structural members:
+
+```python
+model.add_rectangular_section(
+    name="vigas", 
+    material_name="concreto", 
+    base=0.3, 
+    height=0.5
+)
+
+model.add_rectangular_section(
+    name="muros", 
+    material_name="concreto", 
+    base=0.3, 
+    height=2.0
+)
+```
+
+- **vigas**: Beam sections (0.3m × 0.5m)
+- **muros**: Column/wall sections (0.3m × 2.0m)
+</Step>
+
+<Step title="Define the geometry">
+Add nodes to define the structure's geometry:
+
+```python
+model.add_node(1, 0, 0)      # Base left
+model.add_node(2, 0, 5)      # Column top left
+model.add_node(3, 7, 8.5)    # Ridge apex
+model.add_node(4, 14, 5)     # Column top right
+model.add_node(5, 14, 0)     # Base right
+model.add_node(6, 7, 5)      # Interior node
+```
+
+This creates a portal frame with a peaked roof configuration.
+</Step>
+
+<Step title="Add structural members">
+Define frame members and trusses connecting the nodes:
+
+```python
+# Columns (using Timoshenko beam theory)
+model.add_member(1, 1, 2, "muros", BeamTheoriesType.TIMOSHENKO)
+model.add_member(4, 4, 5, "muros", BeamTheoriesType.TIMOSHENKO)
+
+# Beams (using Euler-Bernoulli beam theory)
+model.add_member(2, 2, 3, "vigas", BeamTheoriesType.EULER_BERNOULLI)
+model.add_member(3, 3, 4, "vigas", BeamTheoriesType.EULER_BERNOULLI)
+model.add_member(5, 2, 6, "vigas", BeamTheoriesType.EULER_BERNOULLI)
+model.add_member(6, 6, 4, "vigas", BeamTheoriesType.EULER_BERNOULLI)
+
+# Truss elements (axial load only)
+model.add_truss(7, 1, 6, "vigas")
+model.add_truss(8, 6, 5, "vigas")
+```
+
+<Note>
+**Beam Theory Selection:**
+- **Timoshenko**: Accounts for shear deformation, suitable for stocky members
+- **Euler-Bernoulli**: Classical beam theory, suitable for slender members
+- **Truss**: Axial-only elements with no bending stiffness
+</Note>
+</Step>
+
+<Step title="Apply boundary conditions">
+Define restraints at the base nodes:
+
+```python
+model.add_restraint(1, *(False, True, True))  # Roller in x-direction
+model.add_restraint(5, *(False, True, True))  # Roller in x-direction
+```
+
+The tuple represents (x, y, rotation) restraints. `True` means fixed, `False` means free.
+</Step>
+
+<Step title="Add local coordinate systems">
+Define inclined local axes for the base nodes to simulate inclined supports:
+
+```python
+import math
+
+model.add_local_axis_for_node(1, -37 * math.pi/180)  # -37 degrees
+model.add_local_axis_for_node(5, +37 * math.pi/180)  # +37 degrees
+```
+
+This allows the roller supports to be oriented at an angle.
+</Step>
+
+<Step title="Add advanced features">
+Incorporate elastic supports, end offsets, and member releases:
+
+```python
+lengthOffset = 1
+
+# Elastic support at apex
+model.add_elastic_support(3, ky=10)
+
+# End length offsets for rigid end zones
+model.add_end_length_offset(2, la=lengthOffset)
+model.add_end_length_offset(3, lb=lengthOffset)
+
+# Moment releases (pinned connections)
+model.add_releases(5, mi=True)
+model.add_releases(6, mj=True)
+```
+
+- **Elastic support**: Spring support with stiffness ky=10 tonf/m
+- **End offset**: Rigid end zones of 1m length
+- **Releases**: Create pinned connections at member ends (mi = start, mj = end)
+</Step>
+
+<Step title="Define loads">
+Create a load pattern and apply various load types:
+
+```python
+model.add_load_pattern("Live Load")
+
+# Point load at apex
+model.add_point_load(3, "Live Load", 0, -50, 0)
+
+# Distributed loads on beams
+model.add_distributed_load(2, "Live Load", -10, -5)  # Varying load
+model.add_distributed_load(3, "Live Load", -5, -10)  # Varying load
+model.add_distributed_load(5, "Live Load", -5, -5)   # Uniform load
+model.add_distributed_load(6, "Live Load", -5, -5)   # Uniform load
+
+# Prescribed displacements (support settlements)
+model.add_prescribed_dof(1, "Live Load", uy=-0.01, CSys="LOCAL")
+model.add_prescribed_dof(5, "Live Load", uy=-0.01, CSys="LOCAL")
+
+# Gravity load on column
+model.add_distributed_load(1, "Live Load", 10, 10, 'GLOBAL', 'GRAVITY')
+```
+</Step>
+
+<Step title="Configure and solve">
+Set analysis options and solve the model:
+
+```python
+# Set number of points for results visualization
+model.postprocessing_options.n = 100
+
+# Solve the structural system
+model.solve()
+```
+</Step>
+
+<Step title="Visualize results">
+Configure plotting options and display the model:
+
+```python
+# Configure visualization options
+model.plotter_options.mod_scale_dist_qload = 0.7
+model.plotter_options.element_line_width = 0.8
+model.plotter_options.truss_color = "brown"
+model.plotter_options.deformation_line_width = 0.8
+model.plotter_options.elastic_support_label = False
+model.plotter_options.internal_forces_label = True
+
+# Plot the model with loads
+model.plot_model('Live Load')
+
+# Or use the interactive viewer
+# model_viewer(model)
+```
+</Step>
+
+</Steps>
+
+## Full Code
+
+<CodeGroup>
+
+```python portal_frame.py
+from milcapy import SystemModel, BeamTheoriesType, model_viewer
+import math
+
+model = SystemModel()
+
+# Define material
+model.add_material(name="concreto", modulus_elasticity=2.1e6, poisson_ratio=0.2)
+
+# Define sections
+model.add_rectangular_section(name="vigas", material_name="concreto", base=0.3, height=0.5)
+model.add_rectangular_section(name="muros", material_name="concreto", base=0.3, height=2.0)
+
+# Add nodes
+model.add_node(1, 0, 0)
+model.add_node(2, 0, 5)
+model.add_node(3, 7, 8.5)
+model.add_node(4, 14, 5)
+model.add_node(5, 14, 0)
+model.add_node(6, 7, 5)
+
+# Add members
+model.add_member(1, 1, 2, "muros", BeamTheoriesType.TIMOSHENKO)
+model.add_member(2, 2, 3, "vigas", BeamTheoriesType.EULER_BERNOULLI)
+model.add_member(3, 3, 4, "vigas", BeamTheoriesType.EULER_BERNOULLI)
+model.add_member(4, 4, 5, "muros", BeamTheoriesType.TIMOSHENKO)
+model.add_member(5, 2, 6, "vigas", BeamTheoriesType.EULER_BERNOULLI)
+model.add_member(6, 6, 4, "vigas", BeamTheoriesType.EULER_BERNOULLI)
+
+# Add trusses
+model.add_truss(7, 1, 6, "vigas")
+model.add_truss(8, 6, 5, "vigas")
+
+# Add restraints
+model.add_restraint(1, *(False, True, True))
+model.add_restraint(5, *(False, True, True))
+
+# Add local axes for inclined supports
+model.add_local_axis_for_node(1, -37*math.pi/180)
+model.add_local_axis_for_node(5, +37*math.pi/180)
+
+# Advanced features
+lengthOffset = 1
+model.add_elastic_support(3, ky=10)
+model.add_end_length_offset(2, la=lengthOffset)
+model.add_end_length_offset(3, lb=lengthOffset)
+model.add_releases(5, mi=True)
+model.add_releases(6, mj=True)
+
+# Define loads
+model.add_load_pattern("Live Load")
+model.add_point_load(3, "Live Load", 0, -50, 0)
+model.add_distributed_load(2, "Live Load", -10, -5)
+model.add_distributed_load(3, "Live Load", -5, -10)
+model.add_distributed_load(5, "Live Load", -5, -5)
+model.add_distributed_load(6, "Live Load", -5, -5)
+model.add_prescribed_dof(1, "Live Load", uy=-0.01, CSys="LOCAL")
+model.add_prescribed_dof(5, "Live Load", uy=-0.01, CSys="LOCAL")
+model.add_distributed_load(1, "Live Load", 10, 10, 'GLOBAL', 'GRAVITY')
+
+# Configure and solve
+model.postprocessing_options.n = 100
+model.solve()
+
+# Visualize
+model.plotter_options.mod_scale_dist_qload = 0.7
+model.plotter_options.element_line_width = 0.8
+model.plotter_options.truss_color = "brown"
+model.plotter_options.internal_forces_label = True
+
+model.plot_model('Live Load')
+```
+
+</CodeGroup>
+
+## Key Concepts
+
+<CardGroup cols={2}>
+
+<Card title="Multiple Beam Theories" icon="ruler-combined">
+Combine different beam formulations in a single model based on member characteristics
+</Card>
+
+<Card title="Local Coordinate Systems" icon="compass">
+Define inclined supports and local reference frames for nodes
+</Card>
+
+<Card title="Elastic Supports" icon="springs">
+Model flexible supports with specified spring stiffness
+</Card>
+
+<Card title="Member Releases" icon="link-slash">
+Create pinned connections and control moment transfer at member ends
+</Card>
+
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+
+<Card title="Truss Analysis" icon="diagram-project" href="/examples/truss-analysis">
+Learn how to model and analyze truss structures
+</Card>
+
+<Card title="Membrane Analysis" icon="grid-2" href="/examples/membrane-analysis">
+Explore 2D membrane element modeling
+</Card>
+
+<Card title="API Reference" icon="code" href="/api/system-model">
+View complete API documentation
+</Card>
+
+<Card title="Advanced Features" icon="wand-magic-sparkles" href="/advanced/end-offsets">
+Explore advanced modeling capabilities
+</Card>
+
+</CardGroup>

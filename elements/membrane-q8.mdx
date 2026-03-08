@@ -1,0 +1,396 @@
+---
+title: "Q8 Membrane Element"
+description: "8-node serendipity quadrilateral with superior single-element accuracy"
+---
+
+## Overview
+
+The Q8 membrane element is a high-performance 8-node quadrilateral featuring:
+
+- **8 nodes**: 4 corner + 4 mid-side nodes
+- **2 DOF per node** (translations in x and y)
+- **Biquadratic shape functions** (4 quadratic + 4 bilinear)
+- **Excellent single-element convergence**
+- Serendipity element with isoparametric formulation
+- **4-point (reduced) or 9-point (full) integration**
+
+<Info>
+The Q8 element provides exceptional accuracy with just a single element—often matching or exceeding the accuracy of many Q4 elements. It's the recommended choice when high precision is needed with minimal mesh refinement.
+</Info>
+
+## Adding Q8 Elements
+
+```python
+from milcapy.utils.types import ConstitutiveModel, IntegrationType
+
+model.add_membrane_q8(
+    id=1,
+    node_ids=[1, 2, 3, 4],  # Only corner nodes
+    section_name='Shell_10mm',
+    state=ConstitutiveModel.PLANE_STRESS,
+    integration=IntegrationType.REDUCED  # or COMPLETE
+)
+```
+
+**Parameters:**
+- `id` (int) → Element ID
+- `node_ids` (list[int]) → List of 4 **corner** node IDs
+- `section_name` (str) → Section name (shell/membrane section)
+- `state` (ConstitutiveModel, optional) → Constitutive model
+- `integration` (IntegrationType, optional) → Integration scheme
+
+**Available constitutive models:**
+- `'PLANE_STRESS'` or `ConstitutiveModel.PLANE_STRESS` (default)
+- `'PLANE_STRAIN'` or `ConstitutiveModel.PLANE_STRAIN`
+
+**Available integration types:**
+- `'REDUCED'` or `IntegrationType.REDUCED` → 4 Gauss points (recommended)
+- `'COMPLETE'` or `IntegrationType.COMPLETE` → 9 Gauss points
+
+<Warning>
+**Critical:** 
+1. Only provide the 4 **corner node IDs**. Mid-side nodes are created automatically.
+2. Nodes must be ordered **counter-clockwise**.
+</Warning>
+
+## Node Ordering
+
+You only specify corner nodes; mid-side nodes are computed automatically:
+
+```
+4 -----7----- 3
+|             |
+8      ·      6  (· = centroid)
+|             |
+1 -----5----- 2
+
+User provides: [1, 2, 3, 4] (corners, counter-clockwise)
+Auto-created: 5, 6, 7, 8 (mid-sides)
+```
+
+**Mid-side node positions:**
+- Node 5: Midpoint of edge 1-2
+- Node 6: Midpoint of edge 2-3
+- Node 7: Midpoint of edge 3-4
+- Node 8: Midpoint of edge 4-1
+
+<Note>
+Mid-side nodes are automatically placed at edge midpoints and their DOF are **statically condensed** to corner nodes. You never see nodes 5-8 in the global system.
+</Note>
+
+## Degrees of Freedom
+
+### Internal Representation (before condensation)
+
+All 8 nodes with 2 DOF each:
+```
+Corner nodes:   [Ux1, Uy1, Ux2, Uy2, Ux3, Uy3, Ux4, Uy4]
+Mid-side nodes: [Ux5, Uy5, Ux6, Uy6, Ux7, Uy7, Ux8, Uy8]
+```
+
+Total internal: **16 DOF**
+
+### Global System (after condensation)
+
+Only corner nodes appear:
+```
+[Ux1, Uy1, Ux2, Uy2, Ux3, Uy3, Ux4, Uy4]
+```
+
+Total global: **8 DOF** (same as Q4)
+
+<Tip>
+The Q8 element has the same global DOF count as Q4 but with vastly superior accuracy thanks to higher-order shape functions.
+</Tip>
+
+## Element Formulation
+
+### Shape Functions
+
+**Corner nodes (biquadratic):**
+```python
+N1 = -(1-ξ)*(1-η)*(1+ξ+η)/4
+N2 = -(1+ξ)*(1-η)*(1-ξ+η)/4
+N3 = -(1+ξ)*(1+η)*(1-ξ-η)/4
+N4 = -(1-ξ)*(1+η)*(1+ξ-η)/4
+```
+
+**Mid-side nodes (quadratic):**
+```python
+N5 = (1-ξ)*(1-η)*(1+ξ)/2  # Edge 1-2
+N6 = (1+ξ)*(1-η)*(1+η)/2  # Edge 2-3
+N7 = (1-ξ)*(1+η)*(1+ξ)/2  # Edge 3-4
+N8 = (1-ξ)*(1-η)*(1+η)/2  # Edge 4-1
+```
+
+Total: **8 shape functions** (4 biquadratic + 4 quadratic)
+
+### Integration Schemes
+
+#### Reduced Integration (4 points)
+
+```python
+ξ = η = ±1/√3
+weights = [1, 1, 1, 1]
+```
+
+**Advantages:**
+- Faster computation
+- Avoids excessive shear stiffness (parasitic shear)
+- **Recommended for most cases**
+
+#### Complete Integration (9 points)
+
+```python
+ra = √0.6
+ξ = [-ra, ra, ra, -ra, 0, ra, 0, -ra, 0]
+η = [-ra, -ra, ra, ra, -ra, 0, ra, 0, 0]
+w = [25/81, 25/81, 25/81, 25/81, 40/81, 40/81, 40/81, 40/81, 64/81]
+```
+
+**Advantages:**
+- Exact integration of stiffness
+- Better for some complex material models
+
+<Warning>
+**Important:** Complete integration can lead to **overly stiff elements** (parasitic shear locking). Use reduced integration unless you have a specific reason for complete integration.
+</Warning>
+
+### Static Condensation
+
+Mid-side node DOF are condensed to corner nodes:
+
+```python
+# 16×16 full stiffness matrix
+K_full = [[K_cc,  K_ci],  # corner-corner, corner-internal
+          [K_ic,  K_ii]]  # internal-corner, internal-internal
+
+# Condensed 8×8 matrix
+K_condensed = K_cc - K_ci @ inv(K_ii) @ K_ic
+```
+
+The final element stiffness is 8×8, matching Q4 size but with superior accuracy.
+
+## Integration Type Selection
+
+<CardGroup cols={2}>
+
+<Card title="Reduced (4-point)" icon="gauge-simple-low">
+  **Recommended for most applications**
+  - Avoids parasitic shear
+  - Faster computation
+  - Better for thin structures
+  - Default choice
+</Card>
+
+<Card title="Complete (9-point)" icon="gauge-simple-high">
+  **Use for special cases**
+  - Exact stiffness integration
+  - Very thick plates
+  - Complex material models
+  - When reduced is too soft
+</Card>
+
+</CardGroup>
+
+<Note>
+**Parasitic shear:** Artificial shear stiffness that can make elements overly stiff in bending. Reduced integration alleviates this issue.
+</Note>
+
+## Example: Single-Element Beam
+
+```python
+import milcapy as mx
+from milcapy.utils.types import ConstitutiveModel, IntegrationType
+
+# Model a cantilever beam with just ONE Q8 element
+model = mx.Model()
+
+# Beam: 1.5m long × 0.6m deep
+L = 1.5
+h = 0.6
+
+# Corner nodes only
+model.add_node(1, 0.0, 0.0)
+model.add_node(2, L, 0.0)
+model.add_node(3, L, h)
+model.add_node(4, 0.0, h)
+
+# Material and section
+E = 2534.56e6  # Pa (253.456 GPa converted)
+model.add_material('Concrete', E=E, v=0.2, rho=2400)
+model.add_shell_section('Wall', material='Concrete', t=0.25)  # 250mm thick
+
+# Single Q8 element with reduced integration
+model.add_membrane_q8(
+    id=1,
+    node_ids=[1, 2, 3, 4],  # Only corners!
+    section_name='Wall',
+    state=ConstitutiveModel.PLANE_STRESS,
+    integration=IntegrationType.REDUCED
+)
+
+# Fixed support at left edge
+model.add_support(node_id=1, ux=True, uy=True)
+model.add_support(node_id=4, ux=True, uy=True)
+
+# Point loads at right edge
+model.add_load_pattern('Live')
+model.add_nodal_load(node_id=2, fx=0, fy=3000)  # 3 kN
+model.add_nodal_load(node_id=3, fx=0, fy=3000)  # 3 kN
+
+# Solve
+model.solve('Live')
+
+# Get tip deflection
+disp = model.get_node_displacements(3)
+print(f"Tip deflection: {abs(disp[1])*1000:.4f} mm")
+```
+
+<Info>
+**Remarkable:** This single Q8 element provides excellent accuracy. A Q4 mesh would need 20+ elements to achieve similar results!
+</Info>
+
+## Example: Integration Comparison
+
+```python
+import milcapy as mx
+from milcapy.utils.types import ConstitutiveModel, IntegrationType
+
+def analyze_with_integration(int_type):
+    """Compare reduced vs complete integration"""
+    model = mx.Model()
+    
+    # Simple square plate
+    model.add_node(1, 0, 0)
+    model.add_node(2, 1, 0)
+    model.add_node(3, 1, 1)
+    model.add_node(4, 0, 1)
+    
+    model.add_material('Steel', E=200e9, v=0.3, rho=7850)
+    model.add_shell_section('Plate', material='Steel', t=0.01)
+    
+    # Q8 with specified integration
+    model.add_membrane_q8(
+        id=1,
+        node_ids=[1, 2, 3, 4],
+        section_name='Plate',
+        state=ConstitutiveModel.PLANE_STRESS,
+        integration=int_type
+    )
+    
+    # Boundary and load
+    model.add_support(1, ux=True, uy=True)
+    model.add_support(2, ux=True, uy=True)
+    model.add_load_pattern('P')
+    model.add_nodal_load(3, fx=1000, fy=0)
+    
+    model.solve('P')
+    disp = model.get_node_displacements(3)
+    return abs(disp[0]) * 1000  # mm
+
+# Compare
+disp_reduced = analyze_with_integration(IntegrationType.REDUCED)
+disp_complete = analyze_with_integration(IntegrationType.COMPLETE)
+
+print(f"Reduced (4-pt):  {disp_reduced:.6f} mm")
+print(f"Complete (9-pt): {disp_complete:.6f} mm")
+print(f"Difference: {abs(disp_reduced-disp_complete)/disp_reduced*100:.2f}%")
+```
+
+## Usage Recommendations
+
+<Warning>
+**Critical recommendations for Q8 elements:**
+
+1. **DO NOT over-discretize**: Q8 has excellent single-element convergence. Using many Q8 elements can make the structure **too flexible** and diverge from the exact solution.
+
+2. **Use sparingly**: 1-3 Q8 elements often suffice where you'd need 20+ Q4 elements.
+
+3. **Prefer reduced integration**: Avoids parasitic shear and gives better results for most applications.
+</Warning>
+
+## Mesh Guidelines
+
+### When to Use Coarse Mesh (Recommended)
+
+```python
+# Good: Few Q8 elements
+create_q8_mesh(nx=2, ny=2)  # Just 4 elements total
+```
+
+### When NOT to Over-Refine
+
+```python
+# Avoid: Too many Q8 elements makes solution too flexible
+create_q8_mesh(nx=20, ny=20)  # 400 elements - OVERKILL!
+```
+
+<Tip>
+**Rule of thumb:** If you need a refined mesh, consider using Q4 or Q6i elements instead. Q8 is for coarse, accurate meshes.
+</Tip>
+
+## Advantages and Limitations
+
+### Advantages
+- **Outstanding single-element accuracy**
+- Eliminates shear locking
+- Very robust formulation
+- Same global DOF as Q4 (8 per element)
+- Can model curved boundaries well
+- Ideal for coarse meshes
+
+### Limitations
+- Higher computational cost per element
+- More integration points (4 or 9 vs Q4's 4)
+- Over-refinement leads to poor results
+- More complex shape functions
+- Not ideal for highly refined meshes
+
+## When to Use Q8 Elements
+
+**Best for:**
+- **Single or few elements** spanning a structure
+- High accuracy with minimal meshing
+- Complex curved geometries
+- When mesh generation is difficult
+- Preliminary analysis with coarse mesh
+- **Recommended when best accuracy is needed**
+
+**Avoid when:**
+- You want highly refined meshes (use Q4 instead)
+- Minimal computation per element is critical
+- Simple rectangular geometries with many elements
+
+## Element Comparison
+
+| Feature | CST | Q4 | Q6 | Q6i | Q8 |
+|---------|-----|----|----|-----|----|
+| Nodes | 3 | 4 | 4 | 4 | 4+4 |
+| DOF/node | 2 | 2 | 3 | 2 | 2 |
+| Shape functions | Linear | Bilinear | Bilinear+quad | Bilinear+incompat | Biquadratic |
+| Single-element accuracy | Poor | Low | Medium | Medium | **Excellent** |
+| Mesh recommendation | Very fine | Fine | Medium | Medium | **Coarse** |
+| Shear locking | Yes | Yes | No | No | No |
+| Best use | Filler | General refined | General | Thick beams | **Best accuracy** |
+
+<Info>
+**Summary:** Q8 is the most accurate membrane element in milcapy. Use it when you need the best results with the fewest elements.
+</Info>
+
+## Technical Notes
+
+### Serendipity vs. Lagrangian
+
+Q8 is a "serendipity" element (no center node), offering:
+- Fewer DOF than full Lagrangian elements
+- Adequate accuracy for most applications
+- Simpler implementation
+
+### Jacobian Determinant
+
+For curved elements, the Jacobian varies within the element. Q8 accurately represents this variation.
+
+### Stress Recovery
+
+Stresses should be evaluated at Gauss points or extrapolated to nodes. Q8 provides smooth, accurate stress fields.

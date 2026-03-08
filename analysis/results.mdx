@@ -1,0 +1,310 @@
+---
+title: 'Results Extraction'
+description: 'Extract and interpret structural analysis results from solved models'
+---
+
+## Overview
+
+After solving your model, milcapy stores all results in `Results` objects that you can query to extract displacements, reactions, internal forces, stresses, and strains.
+
+## Getting Results
+
+Retrieve the `Results` object for a specific load pattern:
+
+```python
+model.solve()
+
+# Get results for a specific load pattern
+results = model.get_results("Dead Load")
+```
+
+## Model-Level Results
+
+Get global displacement and reaction vectors for the entire model:
+
+```python
+# Global displacement vector (length = 3 * number_of_nodes)
+displacements = results.get_model_displacements()
+
+# Global reaction vector (length = 3 * number_of_nodes)
+reactions = results.get_model_reactions()
+```
+
+<Note>
+  The global vectors are organized as `[Ux1, Uy1, Rz1, Ux2, Uy2, Rz2, ...]` where subscripts indicate node numbers.
+</Note>
+
+## Node Results
+
+Extract displacements and reactions at individual nodes:
+
+```python
+# Get displacements for node 5
+node_disp = results.get_node_displacements(node_id=5)
+# Returns: np.array([Ux, Uy, Rz])
+
+# Get reactions for node 1
+node_react = results.get_node_reactions(node_id=1)
+# Returns: np.array([Rx, Ry, Mz])
+```
+
+### Example: Node Results
+
+```python
+from milcapy import SystemModel
+
+model = SystemModel()
+# ... define model ...
+model.solve()
+
+results = model.get_results("Dead Load")
+
+# Check displacement at node 3
+disp = results.get_node_displacements(3)
+print(f"Node 3 - Ux: {disp[0]:.6f}, Uy: {disp[1]:.6f}, Rz: {disp[2]:.6f}")
+
+# Check reactions at support (node 1)
+react = results.get_node_reactions(1)
+print(f"Node 1 - Rx: {react[0]:.2f}, Ry: {react[1]:.2f}, Mz: {react[2]:.2f}")
+```
+
+## Member Results
+
+For frame and beam elements, extract detailed results including forces and diagrams:
+
+### End Forces and Displacements
+
+```python
+# Get member end displacements [Uxi, Uyi, Rzi, Uxj, Uyj, Rzj]
+member_disp = results.get_member_displacements(member_id=2)
+
+# Get member end forces [Ni, Vi, Mi, Nj, Vj, Mj]
+member_forces = results.get_member_internal_forces(member_id=2)
+```
+
+### Force Diagrams Along Member
+
+```python
+# Get axial force diagram
+N = results.get_member_axial_force(member_id=2)
+
+# Get shear force diagram
+V = results.get_member_shear_force(member_id=2)
+
+# Get bending moment diagram
+M = results.get_member_bending_moment(member_id=2)
+
+# Get x-coordinates for diagrams
+x_vals = results.get_member_x_val(member_id=2)
+```
+
+### Displacement Diagrams
+
+```python
+# Get deflection (transverse displacement)
+deflection = results.get_member_deflection(member_id=2)
+
+# Get slope (rotation)
+slope = results.get_member_slope(member_id=2)
+
+# Get axial displacement
+axial_disp = results.get_member_axial_displacement(member_id=2)
+```
+
+### Complete Member Results Dictionary
+
+```python
+# Get all results for a member
+member_results = results.get_results_member(member_id=2)
+# Returns a dict with keys: 'displacements', 'internal_forces', 
+# 'axial_forces', 'shear_forces', 'bending_moments', 
+# 'deflections', 'slopes', 'axial_displacements', 'x_val'
+```
+
+## Truss Results
+
+For truss elements:
+
+```python
+# Get truss end displacements [Uxi, Uxj]
+truss_disp = results.get_truss_displacements(truss_id=10)
+
+# Get truss internal forces [Ni, Nj]
+truss_forces = results.get_truss_internal_forces(truss_id=10)
+
+# Get axial force diagram
+truss_axial = results.get_truss_axial_force(truss_id=10)
+
+# Get axial displacement diagram
+truss_axial_disp = results.get_truss_axial_displacement(truss_id=10)
+
+# Get all truss results
+truss_results = results.get_results_truss(truss_id=10)
+```
+
+## Finite Element Results (Membranes)
+
+### CST Elements (Constant Strain Triangle)
+
+```python
+# Get nodal displacements [Ux1, Uy1, Ux2, Uy2, Ux3, Uy3]
+cst_disp = results.get_cst_displacements(cst_id=15)
+
+# Get strains [εx, εy, γxy]
+cst_strains = results.get_cst_strains(cst_id=15)
+
+# Get stresses [σx, σy, τxy]
+cst_stresses = results.get_cst_stresses(cst_id=15)
+```
+
+### Membrane Q6/Q6I Elements
+
+```python
+# For Q6 elements (3 DOF per node)
+q6_disp = results.get_membrane_q3dof_displacements(membrane_q3dof_id=20)
+# Returns: [Ux1, Uy1, Rz1, Ux2, Uy2, Rz2, Ux3, Uy3, Rz3, Ux4, Uy4, Rz4]
+
+# For Q6I/Q4/Q8 elements (2 DOF per node)
+q6i_disp = results.get_membrane_q2dof_displacements(membrane_q2dof_id=21)
+# Returns: [Ux1, Uy1, Ux2, Uy2, Ux3, Uy3, Ux4, Uy4]
+```
+
+## Exporting Results to DataFrames
+
+Convert results to pandas DataFrames for easy export and analysis:
+
+```python
+import pandas as pd
+
+model.solve()
+results = model.get_results("Dead Load")
+
+# Get node and element results as DataFrames
+df_nodes, df_elements = results.get_dataframes()
+
+# Node DataFrame columns:
+# ['node_id', 'Ux', 'Uy', 'Rz', 'ReacFx', 'ReacFy', 'ReacMz']
+print(df_nodes.head())
+
+# Element DataFrame columns:
+# ['ele_id', 'Uxi', 'Uyi', 'Rzi', 'Uxj', 'Uyj', 'Rzj',
+#  'Ni', 'Vi', 'Mi', 'Nj', 'Vj', 'Mj']
+print(df_elements.head())
+
+# Export to CSV
+df_nodes.to_csv("node_results.csv", index=False)
+df_elements.to_csv("element_results.csv", index=False)
+```
+
+## Complete Example
+
+```python
+from milcapy import SystemModel, BeamTheoriesType
+import numpy as np
+
+model = SystemModel()
+
+# Build model
+model.add_material("steel", modulus_elasticity=2e8, poisson_ratio=0.3)
+model.add_rectangular_section("beam", "steel", base=0.2, height=0.4)
+
+model.add_node(1, 0, 0)
+model.add_node(2, 5, 0)
+model.add_node(3, 10, 0)
+
+model.add_member(1, 1, 2, "beam")
+model.add_member(2, 2, 3, "beam")
+
+model.add_restraint(1, ux=True, uy=True, rz=True)
+model.add_restraint(3, ux=False, uy=True, rz=False)
+
+model.add_load_pattern("Load")
+model.add_point_load(2, "Load", fy=-50)
+model.add_distributed_load(1, "Load", load_start=-10, load_end=-10)
+
+# Solve and extract results
+model.solve()
+results = model.get_results("Load")
+
+# Node results
+print("\n=== NODE RESULTS ===")
+for node_id in [1, 2, 3]:
+    disp = results.get_node_displacements(node_id)
+    react = results.get_node_reactions(node_id)
+    print(f"Node {node_id}:")
+    print(f"  Displacement: Ux={disp[0]:.6f}, Uy={disp[1]:.6f}, Rz={disp[2]:.6f}")
+    print(f"  Reactions: Rx={react[0]:.2f}, Ry={react[1]:.2f}, Mz={react[2]:.2f}")
+
+# Member results
+print("\n=== MEMBER RESULTS ===")
+for member_id in [1, 2]:
+    forces = results.get_member_internal_forces(member_id)
+    print(f"Member {member_id}:")
+    print(f"  Node i: N={forces[0]:.2f}, V={forces[1]:.2f}, M={forces[2]:.2f}")
+    print(f"  Node j: N={forces[3]:.2f}, V={forces[4]:.2f}, M={forces[5]:.2f}")
+    
+    # Max moment
+    M_diagram = results.get_member_bending_moment(member_id)
+    M_max = np.max(np.abs(M_diagram))
+    print(f"  Max moment: {M_max:.2f}")
+```
+
+## Results Object Structure
+
+The `Results` class stores data in the following structure:
+
+```python
+results.model = {
+    "displacements": np.ndarray,  # Global displacement vector
+    "reactions": np.ndarray       # Global reaction vector
+}
+
+results.nodes = {
+    node_id: {
+        "displacements": np.ndarray,  # [Ux, Uy, Rz]
+        "reactions": np.ndarray       # [Rx, Ry, Mz]
+    }
+}
+
+results.members = {
+    member_id: {
+        "displacements": np.ndarray,        # [Uxi, Uyi, Rzi, Uxj, Uyj, Rzj]
+        "internal_forces": np.ndarray,      # [Ni, Vi, Mi, Nj, Vj, Mj]
+        "x_val": np.ndarray,                # x-coordinates
+        "axial_forces": np.ndarray,         # N(x)
+        "shear_forces": np.ndarray,         # V(x)
+        "bending_moments": np.ndarray,      # M(x)
+        "deflections": np.ndarray,          # y(x)
+        "slopes": np.ndarray,               # θ(x)
+        "axial_displacements": np.ndarray   # u(x)
+    }
+}
+
+results.trusses = {
+    truss_id: {
+        "displacements": np.ndarray,
+        "internal_forces": np.ndarray,
+        "axial_forces": np.ndarray,
+        "axial_displacements": np.ndarray
+    }
+}
+
+results.CST = {
+    cst_id: {
+        "displacements": np.ndarray,
+        "strains": np.ndarray,
+        "stresses": np.ndarray
+    }
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Visualization" icon="eye" href="/analysis/visualization">
+    Visualize results with interactive plots
+  </Card>
+  <Card title="Model Building" icon="cubes" href="/concepts/model">
+    Learn more about building structural models
+  </Card>
+</CardGroup>

@@ -1,0 +1,458 @@
+---
+title: "Sections API"
+description: "Define cross-section geometry and properties for structural members"
+---
+
+## Overview
+
+Sections define the geometric properties of structural members. Each section is associated with a material and provides area, moment of inertia, and shear coefficients needed for structural analysis.
+
+milcapy supports four types of sections:
+
+- **Rectangular**: Standard rectangular cross-sections
+- **Circular**: Circular cross-sections
+- **Generic**: Custom sections with user-defined properties
+- **Shell**: Thin sections for membrane/plate elements
+
+## add_rectangular_section()
+
+Adds a rectangular cross-section to the model.
+
+```python
+model.add_rectangular_section(
+    name="beam_30x50",
+    material_name="concrete",
+    base=0.30,
+    height=0.50
+)
+```
+
+### Parameters
+
+<ParamField path="name" type="str" required>
+  Unique identifier for the section. Used when creating members.
+</ParamField>
+
+<ParamField path="material_name" type="str" required>
+  Name of a previously defined material.
+</ParamField>
+
+<ParamField path="base" type="float" required>
+  Width of the rectangular section (b).
+  
+  Must be greater than 0.
+</ParamField>
+
+<ParamField path="height" type="float" required>
+  Height/depth of the rectangular section (h).
+  
+  Must be greater than 0.
+</ParamField>
+
+### Returns
+
+<ResponseField name="RectangularSection" type="Section">
+  Returns a RectangularSection object with computed properties:
+  
+  - **Area**: A = b × h
+  - **Moment of Inertia**: I = (b × h³) / 12
+  - **Shear Coefficient**: k = 5/6 (Timoshenko)
+</ResponseField>
+
+### Example
+
+```python
+from milcapy import SystemModel
+
+model = SystemModel()
+
+# Define material first
+model.add_material("concrete", 25000, 0.2, 2400)
+
+# Add rectangular sections
+model.add_rectangular_section(
+    name="column_40x40",
+    material_name="concrete",
+    base=0.40,
+    height=0.40
+)
+
+model.add_rectangular_section(
+    name="beam_30x60",
+    material_name="concrete",
+    base=0.30,
+    height=0.60
+)
+```
+
+## add_circular_section()
+
+Adds a circular cross-section to the model.
+
+```python
+model.add_circular_section(
+    name="pipe_200",
+    material_name="steel",
+    diameter=0.20
+)
+```
+
+### Parameters
+
+<ParamField path="name" type="str" required>
+  Unique identifier for the section.
+</ParamField>
+
+<ParamField path="material_name" type="str" required>
+  Name of a previously defined material.
+</ParamField>
+
+<ParamField path="diameter" type="float" required>
+  Diameter of the circular section (d).
+  
+  Must be greater than 0.
+</ParamField>
+
+### Returns
+
+<ResponseField name="CircularSection" type="Section">
+  Returns a CircularSection object with computed properties:
+  
+  - **Area**: A = π × r²
+  - **Moment of Inertia**: I = (π × d⁴) / 64
+  - **Shear Coefficient**: k = 9/10 (Timoshenko)
+</ResponseField>
+
+### Example
+
+```python
+model.add_material("steel", 200000, 0.3, 7850)
+
+# Solid circular sections
+model.add_circular_section(
+    name="rod_25mm",
+    material_name="steel",
+    diameter=0.025  # 25mm
+)
+
+model.add_circular_section(
+    name="column_300",
+    material_name="steel",
+    diameter=0.30  # 300mm
+)
+```
+
+## add_generic_section()
+
+Adds a section with custom geometric properties.
+
+```python
+model.add_generic_section(
+    name="W14x22",
+    material_name="steel",
+    area=6.49e-3,
+    inertia=2.06e-5,
+    k_factor=0.54
+)
+```
+
+### Parameters
+
+<ParamField path="name" type="str" required>
+  Unique identifier for the section.
+</ParamField>
+
+<ParamField path="material_name" type="str" required>
+  Name of a previously defined material.
+</ParamField>
+
+<ParamField path="area" type="float" required>
+  Cross-sectional area (A).
+  
+  Must be greater than 0.
+</ParamField>
+
+<ParamField path="inertia" type="float" required>
+  Moment of inertia about the strong axis (I).
+  
+  Must be greater than 0.
+</ParamField>
+
+<ParamField path="k_factor" type="float" required>
+  Shear coefficient factor.
+  
+  The effective shear area is: A_shear = A × k_factor
+  
+  Typical values:
+  - Rectangular: 5/6 ≈ 0.833
+  - Circular: 9/10 = 0.9
+  - I-beams: 0.3 - 0.6
+</ParamField>
+
+### Returns
+
+<ResponseField name="GenericSection" type="Section">
+  Returns a GenericSection with the specified properties.
+</ResponseField>
+
+### Example: Steel Wide Flange Sections
+
+```python
+model.add_material("A992_steel", 200000, 0.3, 7850)
+
+# W14x22 section (SI units: m)
+model.add_generic_section(
+    name="W14x22",
+    material_name="A992_steel",
+    area=4.19e-3,      # m²
+    inertia=2.06e-5,   # m⁴
+    k_factor=0.54
+)
+
+# W18x50 section
+model.add_generic_section(
+    name="W18x50",
+    material_name="A992_steel",
+    area=9.48e-3,
+    inertia=8.88e-5,
+    k_factor=0.51
+)
+```
+
+### Example: Composite Section
+
+```python
+# Custom composite or built-up section
+model.add_generic_section(
+    name="composite_beam",
+    material_name="concrete",
+    area=0.25,         # Pre-calculated area
+    inertia=0.0052,    # Pre-calculated inertia
+    k_factor=0.75      # Estimated shear factor
+)
+```
+
+## add_shell_section()
+
+Adds a shell section for membrane or plate finite elements.
+
+```python
+model.add_shell_section(
+    name="wall_200mm",
+    material_name="concrete",
+    thickness=0.20
+)
+```
+
+### Parameters
+
+<ParamField path="name" type="str" required>
+  Unique identifier for the section.
+</ParamField>
+
+<ParamField path="material_name" type="str" required>
+  Name of a previously defined material.
+</ParamField>
+
+<ParamField path="thickness" type="float" required>
+  Thickness of the shell element (t).
+  
+  Must be greater than 0.
+</ParamField>
+
+### Returns
+
+<ResponseField name="ShellSection" type="ShellSection">
+  Returns a ShellSection object used for 2D membrane elements (CST, Q4, Q6, Q8).
+</ResponseField>
+
+### Example
+
+```python
+model.add_material("concrete", 25000, 0.2, 2400)
+
+# Concrete wall sections
+model.add_shell_section(
+    name="wall_150",
+    material_name="concrete",
+    thickness=0.15
+)
+
+model.add_shell_section(
+    name="wall_200",
+    material_name="concrete",
+    thickness=0.20
+)
+
+model.add_shell_section(
+    name="slab_120",
+    material_name="concrete",
+    thickness=0.12
+)
+```
+
+## Property Modifiers
+
+### set_property_modifiers()
+
+Apply modification factors to section properties. Useful for cracked section analysis or construction staging.
+
+```python
+model.set_property_modifiers(
+    section_name="beam_30x50",
+    axial_area=0.8,      # 80% of gross area
+    shear_area=1.0,      # 100% of shear area
+    moment_inertia=0.5,  # 50% of gross inertia (cracked)
+    weight=1.0           # 100% of weight
+)
+```
+
+### Parameters
+
+<ParamField path="section_name" type="str" required>
+  Name of the section to modify.
+</ParamField>
+
+<ParamField path="axial_area" type="float" default="1.0">
+  Multiplier for axial area (kA).
+  
+  Effective area: A_eff = A × axial_area
+</ParamField>
+
+<ParamField path="shear_area" type="float" default="1.0">
+  Multiplier for shear area (kAs).
+  
+  Effective shear area: As_eff = As × shear_area
+</ParamField>
+
+<ParamField path="moment_inertia" type="float" default="1.0">
+  Multiplier for moment of inertia (kI).
+  
+  Effective inertia: I_eff = I × moment_inertia
+  
+  Common for cracked concrete sections (often 0.35 - 0.5).
+</ParamField>
+
+<ParamField path="weight" type="float" default="1.0">
+  Multiplier for self-weight (kg).
+  
+  Effective weight: W_eff = W × weight
+</ParamField>
+
+### Example: Cracked Section Analysis
+
+```python
+model.add_material("concrete", 25000, 0.2, 2400)
+model.add_rectangular_section("beam", "concrete", 0.3, 0.5)
+
+# Model cracked concrete section
+model.set_property_modifiers(
+    section_name="beam",
+    moment_inertia=0.35,  # 35% of gross inertia (typical for cracked concrete)
+    weight=1.0            # Full weight still applies
+)
+```
+
+## Section Properties Summary
+
+Each section type computes the following properties:
+
+### Rectangular Section
+
+```
+A = b × h
+I = (b × h³) / 12
+k = 5/6  (Timoshenko shear coefficient)
+```
+
+### Circular Section
+
+```
+A = π × r² = π × (d/2)²
+I = (π × d⁴) / 64
+k = 9/10  (Timoshenko shear coefficient)
+```
+
+### Generic Section
+
+```
+A = (user specified)
+I = (user specified)
+k = (user specified)
+```
+
+### Shell Section
+
+```
+t = thickness (used in membrane stiffness calculations)
+```
+
+## Validation
+
+All section creation methods perform validation:
+
+<Check>
+  **Unique Name**: Section name must not already exist
+</Check>
+
+<Check>
+  **Material Exists**: Referenced material must be defined
+</Check>
+
+<Check>
+  **Positive Dimensions**: All geometric properties must be > 0
+</Check>
+
+### Error Examples
+
+```python
+# These will raise ValueError
+
+# Material doesn't exist
+model.add_rectangular_section("beam", "undefined_mat", 0.3, 0.5)
+
+# Negative dimensions
+model.add_rectangular_section("beam", "concrete", -0.3, 0.5)
+
+# Zero diameter
+model.add_circular_section("column", "steel", 0)
+
+# Duplicate name
+model.add_rectangular_section("beam", "concrete", 0.3, 0.5)
+model.add_rectangular_section("beam", "steel", 0.4, 0.6)  # Error: name exists
+```
+
+## Complete Example
+
+```python
+from milcapy import SystemModel, BeamTheoriesType
+
+model = SystemModel()
+
+# Define materials
+model.add_material("concrete", 25000, 0.2, 2400)
+model.add_material("steel", 200000, 0.3, 7850)
+
+# Define various sections
+model.add_rectangular_section("column_40x40", "concrete", 0.4, 0.4)
+model.add_rectangular_section("beam_30x60", "concrete", 0.3, 0.6)
+model.add_circular_section("brace_100", "steel", 0.1)
+model.add_shell_section("wall_200", "concrete", 0.2)
+
+# Apply cracking to beam
+model.set_property_modifiers(
+    section_name="beam_30x60",
+    moment_inertia=0.35  # Cracked section
+)
+
+# Use sections in members
+model.add_node(1, 0, 0)
+model.add_node(2, 5, 0)
+model.add_member(1, 1, 2, "beam_30x60", BeamTheoriesType.TIMOSHENKO)
+```
+
+## See Also
+
+- [Materials API](/api/materials) - Define material properties
+- [SystemModel](/api/system-model) - Main model class
+- [Members](/api/system-model#add_member) - Create structural members using sections

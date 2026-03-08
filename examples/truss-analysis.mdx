@@ -1,0 +1,306 @@
+---
+title: "Truss Analysis"
+description: "Build and analyze a 2D truss structure with the milcatrusspy module"
+---
+
+This example shows how to create and analyze a planar truss structure using the `milcatrusspy` module, which is specialized for truss analysis with axial-only elements.
+
+## Overview
+
+In this example, you'll build a simple 2D truss consisting of:
+- 5 nodes forming a trapezoidal geometry
+- 8 bar elements with two different cross-sectional areas
+- Fixed and roller supports at the base
+- Concentrated loads at the top chord
+
+## Complete Example
+
+<Steps>
+
+<Step title="Import the truss module">
+Import the specialized truss analysis module:
+
+```python
+from milcatrusspy import Model
+```
+
+<Note>
+The `milcatrusspy` module is specifically designed for truss analysis, offering a simplified interface for structures with axial-only elements.
+</Note>
+</Step>
+
+<Step title="Define material properties">
+Set up material properties for different member groups:
+
+```python
+# Material definition: [E, A]
+# E = Elastic modulus (tonf/m²)
+# A = Cross-sectional area (m²)
+
+matK1 = [2.1e6, 0.3*0.4]  # E=2.1e6, A=0.12 m²
+matK2 = [2.1e6, 0.4*0.4]  # E=2.1e6, A=0.16 m²
+```
+
+The material is defined as a list containing:
+- **E**: Modulus of elasticity
+- **A**: Cross-sectional area
+</Step>
+
+<Step title="Create the model">
+Initialize a 2D truss model:
+
+```python
+model = Model(ndm=2)
+```
+
+The `ndm=2` parameter specifies a 2-dimensional model (x, y coordinates).
+</Step>
+
+<Step title="Add nodes">
+Define the truss geometry by adding nodes:
+
+```python
+model.add_node(1, 0, 0)  # Bottom left - fixed support
+model.add_node(2, 3, 0)  # Bottom right - roller support
+model.add_node(3, 5, 3)  # Top right
+model.add_node(4, 3, 3)  # Top middle
+model.add_node(5, 0, 3)  # Top left
+```
+
+This creates a trapezoidal truss configuration:
+```
+    5 -------- 4 -------- 3
+    |        / | \        |
+    |      /   |   \      |
+    |    /     |     \    |
+    |  /       |       \  |
+    1 -------- 2
+```
+</Step>
+
+<Step title="Add truss elements">
+Connect the nodes with bar elements:
+
+```python
+# Vertical and horizontal members (matK1)
+model.add_element(1, 2, 1, *matK1)  # Bottom chord
+model.add_element(2, 3, 2, *matK1)  # Right vertical
+model.add_element(3, 4, 3, *matK1)  # Top chord segment
+model.add_element(4, 4, 5, *matK1)  # Top chord segment
+model.add_element(5, 5, 1, *matK1)  # Left vertical
+
+# Diagonal members (matK2 - larger area)
+model.add_element(6, 2, 4, *matK2)  # Diagonal from node 2 to 4
+model.add_element(7, 1, 4, *matK2)  # Diagonal from node 1 to 4
+model.add_element(8, 2, 5, *matK2)  # Diagonal from node 2 to 5
+```
+
+The diagonal members use a larger cross-section (matK2) as they typically carry higher loads.
+</Step>
+
+<Step title="Apply boundary conditions">
+Define support restraints:
+
+```python
+model.set_restraints(1, True, True)   # Fixed support (both x and y restrained)
+model.set_restraints(2, False, True)  # Roller support (only y restrained)
+```
+
+The parameters represent (x-restraint, y-restraint):
+- Node 1: Fully fixed (pin support)
+- Node 2: Roller in x-direction, fixed in y-direction
+</Step>
+
+<Step title="Apply loads">
+Add point loads to the structure:
+
+```python
+model.set_load(3, 5, -6)  # Node 3: Fx=5 tonf, Fy=-6 tonf
+```
+
+The parameters are (node_id, force_x, force_y).
+</Step>
+
+<Step title="Solve the system">
+Perform the structural analysis:
+
+```python
+model.solve()
+```
+
+This assembles the global stiffness matrix, applies loads and boundary conditions, and solves for displacements and member forces.
+</Step>
+
+<Step title="View results">
+Print and visualize the analysis results:
+
+```python
+# Print numerical results to console
+model.print_results()
+
+# Visualize the model
+model.plot_model(labels=True)
+
+# Plot deformed shape
+model.plot_deformed(scale=1000, labels=True)
+
+# Plot reactions at supports
+model.plot_reactions()
+
+# Plot axial forces in members
+model.plot_axial_forces(scale=0.03, labels=True)
+```
+
+Each plotting function creates a separate visualization showing different aspects of the analysis.
+</Step>
+
+</Steps>
+
+## Full Code
+
+<CodeGroup>
+
+```python truss_analysis.py
+from milcatrusspy import Model
+
+# Define material properties
+matK1 = [2.1e6, 0.3*0.4]  # [E, A] - Perimeter members
+matK2 = [2.1e6, 0.4*0.4]  # [E, A] - Diagonal members
+
+# Create 2D model
+model = Model(ndm=2)
+
+# Add nodes
+model.add_node(1, 0, 0)  # Bottom left
+model.add_node(2, 3, 0)  # Bottom right
+model.add_node(3, 5, 3)  # Top right
+model.add_node(4, 3, 3)  # Top middle
+model.add_node(5, 0, 3)  # Top left
+
+# Add elements
+model.add_element(1, 2, 1, *matK1)  # Bottom chord
+model.add_element(2, 3, 2, *matK1)  # Right vertical
+model.add_element(3, 4, 3, *matK1)  # Top chord
+model.add_element(4, 4, 5, *matK1)  # Top chord
+model.add_element(5, 5, 1, *matK1)  # Left vertical
+model.add_element(6, 2, 4, *matK2)  # Diagonal
+model.add_element(7, 1, 4, *matK2)  # Diagonal
+model.add_element(8, 2, 5, *matK2)  # Diagonal
+
+# Apply boundary conditions
+model.set_restraints(1, True, True)   # Fixed support
+model.set_restraints(2, False, True)  # Roller support
+
+# Apply loads
+model.set_load(3, 5, -6)  # Fx=5, Fy=-6 at node 3
+
+# Solve
+model.solve()
+
+# Print results
+model.print_results()
+
+# Visualize results
+model.plot_model(labels=True)
+model.plot_deformed(scale=1000, labels=True)
+model.plot_reactions()
+model.plot_axial_forces(scale=0.03, labels=True)
+```
+
+</CodeGroup>
+
+## Understanding the Results
+
+After running the analysis, you'll get:
+
+### Console Output
+The `print_results()` method displays:
+- Nodal displacements (x, y)
+- Support reactions
+- Axial forces in each member
+- Member stresses
+
+### Visualizations
+
+<CardGroup cols={2}>
+
+<Card title="Undeformed Model" icon="diagram-project">
+Shows the original geometry with node and element labels
+</Card>
+
+<Card title="Deformed Shape" icon="wave-pulse">
+Displays the displaced configuration (scaled for visibility)
+</Card>
+
+<Card title="Reactions" icon="arrows-to-dot">
+Visualizes support reaction forces
+</Card>
+
+<Card title="Axial Forces" icon="arrow-right-arrow-left">
+Shows internal forces with tension/compression indication
+</Card>
+
+</CardGroup>
+
+## Key Concepts
+
+### Truss Assumptions
+
+Truss elements in structural analysis assume:
+- Members carry only axial forces (tension or compression)
+- All joints are pinned connections (no moment transfer)
+- Loads are applied only at nodes
+- Members are straight and prismatic
+
+### Sign Convention
+
+- **Positive axial force**: Tension (member is being pulled)
+- **Negative axial force**: Compression (member is being pushed)
+
+<Note>
+The `scale` parameter in `plot_deformed()` and `plot_axial_forces()` controls visualization clarity. Adjust it based on the magnitude of displacements and forces in your model.
+</Note>
+
+## Comparison: milcatrusspy vs SystemModel
+
+<CardGroup cols={2}>
+
+<Card title="milcatrusspy" icon="diagram-project">
+**Use for pure truss analysis:**
+- Simpler API for truss-only structures
+- Direct material property assignment
+- Specialized visualization tools
+- Lightweight and fast
+</Card>
+
+<Card title="SystemModel" icon="building">
+**Use for general frames:**
+- Combines trusses with beams/columns
+- Multiple element types in one model
+- Advanced features (releases, offsets, etc.)
+- Membrane and shell elements
+</Card>
+
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+
+<Card title="Portal Frame" icon="building-columns" href="/examples/simple-portal">
+Learn how to model frame structures with beams
+</Card>
+
+<Card title="Membrane Analysis" icon="grid-2" href="/examples/membrane-analysis">
+Explore 2D plane stress elements
+</Card>
+
+<Card title="API Reference" icon="book" href="/api/system-model">
+View the SystemModel API documentation
+</Card>
+
+<Card title="Load Patterns" icon="weight-hanging" href="/api/loads">
+Learn about different loading types
+</Card>
+
+</CardGroup>

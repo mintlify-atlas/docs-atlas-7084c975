@@ -1,0 +1,383 @@
+---
+title: 'Nodes and Elements'
+description: 'Create structural geometry with nodes and connect them with elements'
+icon: 'diagram-project'
+---
+
+## Overview
+
+Nodes define geometric points in 2D space, while elements are structural members that connect nodes. Together, they form the finite element mesh that represents your structure.
+
+## Nodes
+
+### Creating Nodes
+
+Nodes are defined by a unique ID and x, y coordinates:
+
+```python
+node1 = model.add_node(id=1, x=0.0, y=0.0)
+node2 = model.add_node(id=2, x=4.0, y=0.0)
+node3 = model.add_node(id=3, x=4.0, y=3.0)
+```
+
+### Node Properties
+
+Each node has several properties:
+
+```python
+node = model.nodes[1]
+
+node.id          # Node identifier (int)
+node.vertex      # Coordinates (Vertex object with x, y)
+node.dofs        # Degrees of freedom indices [ux_dof, uy_dof, rz_dof]
+node.restraints  # Boundary conditions (ux, uy, rz)
+```
+
+### Degrees of Freedom
+
+Each node in 2D has 3 degrees of freedom (DOF):
+
+- **ux**: Translation in X direction
+- **uy**: Translation in Y direction  
+- **rz**: Rotation about Z axis
+
+```python
+node = model.nodes[1]
+print(node.dofs)  # Array of global DOF indices, e.g., [1, 2, 3]
+```
+
+<Note>
+  DOF indices are automatically calculated as: `[node_id × 3 - 2, node_id × 3 - 1, node_id × 3]`
+</Note>
+
+## Elements
+
+milcapy supports multiple element types for different structural behaviors.
+
+### Frame/Beam Elements
+
+Frame elements (members) model beams and columns with axial, shear, and bending behavior:
+
+```python
+member = model.add_member(
+    id=1,
+    node_i_id=1,           # Start node
+    node_j_id=2,           # End node
+    section_name="BEAM-30x50",
+    beam_theory="TIMOSHENKO"  # or "EULER_BERNOULLI"
+)
+```
+
+#### Beam Theories
+
+<Accordion title="Timoshenko Beam Theory (Recommended)">
+  Accounts for shear deformation, making it more accurate for:
+  - Short, deep beams
+  - High shear forces
+  - Lower slenderness ratios
+  
+  ```python
+  model.add_member(
+      id=1,
+      node_i_id=1,
+      node_j_id=2,
+      section_name="BEAM-50x100",
+      beam_theory="TIMOSHENKO"
+  )
+  ```
+</Accordion>
+
+<Accordion title="Euler-Bernoulli Beam Theory">
+  Neglects shear deformation, suitable for:
+  - Slender beams (L/h > 10)
+  - Long-span members
+  - When shear deformation is negligible
+  
+  ```python
+  model.add_elastic_euler_bernoulli_beam(
+      id=2,
+      node_i_id=2,
+      node_j_id=3,
+      section_name="BEAM-20x40"
+  )
+  ```
+</Accordion>
+
+#### Convenience Methods
+
+milcapy provides specialized methods for common element types:
+
+```python
+# Timoshenko beam (with axial stiffness)
+beam = model.add_elastic_timoshenko_beam(
+    id=1,
+    node_i_id=1,
+    node_j_id=2,
+    section_name="BEAM-30x50"
+)
+
+# Euler-Bernoulli beam (with axial stiffness)
+beam = model.add_elastic_euler_bernoulli_beam(
+    id=2,
+    node_i_id=2,
+    node_j_id=3,
+    section_name="BEAM-30x50"
+)
+```
+
+### Truss Elements
+
+Truss elements only resist axial forces (no bending):
+
+```python
+truss = model.add_truss(
+    id=10,
+    node_i_id=1,
+    node_j_id=3,
+    section_name="TRUSS-SECTION"
+)
+```
+
+<Note>
+  Truss elements have only 2 DOF per node (ux, uy), with no rotational stiffness.
+</Note>
+
+### Membrane Elements
+
+For 2D plane stress/strain analysis:
+
+#### Constant Strain Triangle (CST)
+
+```python
+cst = model.add_cst(
+    id=20,
+    node_i_id=1,
+    node_j_id=2,
+    node_k_id=3,
+    section_name="SHELL-200",
+    state="PLANE_STRESS"  # or "PLANE_STRAIN"
+)
+```
+
+<Warning>
+  Nodes for membrane elements must be ordered **counter-clockwise**. The model will raise a `ValueError` if nodes are ordered clockwise.
+</Warning>
+
+#### Quadrilateral Membrane Elements
+
+milcapy offers several quadrilateral element formulations:
+
+<Accordion title="Q6 Element (3 DOF/node)">
+  Quadrilateral with drilling DOF (rotation about z-axis):
+  
+  ```python
+  q6 = model.add_membrane_q6(
+      id=21,
+      node_i_id=1,
+      node_j_id=2,
+      node_k_id=3,
+      node_l_id=4,
+      section_name="SHELL-200",
+      state="PLANE_STRESS"
+  )
+  ```
+</Accordion>
+
+<Accordion title="Q6I Element (2 DOF/node with incompatible modes)">
+  Enhanced element with incompatible modes for better accuracy:
+  
+  ```python
+  q6i = model.add_membrane_q6i(
+      id=22,
+      node_i_id=1,
+      node_j_id=2,
+      node_k_id=3,
+      node_l_id=4,
+      section_name="SHELL-200",
+      state="PLANE_STRESS"
+  )
+  ```
+</Accordion>
+
+<Accordion title="Q4 Element (2 DOF/node)">
+  Basic 4-node quadrilateral:
+  
+  ```python
+  q4 = model.add_membrane_q4(
+      id=23,
+      node_i_id=1,
+      node_j_id=2,
+      node_k_id=3,
+      node_l_id=4,
+      section_name="SHELL-200",
+      state="PLANE_STRESS"
+  )
+  ```
+  
+  <Warning>
+    Q4 elements have poor convergence. Use Q8 elements instead for better accuracy.
+  </Warning>
+</Accordion>
+
+<Accordion title="Q8 Element (2 DOF/node, 8 nodes)">
+  Higher-order element with better convergence:
+  
+  ```python
+  q8 = model.add_membrane_q8(
+      id=24,
+      node_i_id=1,
+      node_j_id=2,
+      node_k_id=3,
+      node_l_id=4,
+      section_name="SHELL-200",
+      state="PLANE_STRESS",
+      integration="COMPLETE"  # or "REDUCED"
+  )
+  ```
+</Accordion>
+
+## Element Properties
+
+All elements share common properties:
+
+```python
+member = model.members[1]
+
+member.id          # Element ID
+member.node_i      # Start node object
+member.node_j      # End node object
+member.section     # Section object
+member.dofs        # Array of DOF indices
+member.length()    # Element length
+member.angle_x()   # Angle with respect to global X-axis
+```
+
+## Advanced Element Features
+
+### End Length Offsets (Rigid Arms)
+
+Model rigid end zones in frame members:
+
+```python
+model.add_end_length_offset(
+    member_id=1,
+    la=0.25,    # Rigid arm length at start (m)
+    lb=0.25,    # Rigid arm length at end (m)
+    qla=True,   # Apply loads to start rigid arm
+    qlb=True,   # Apply loads to end rigid arm
+    fla=1.0,    # Rigid zone factor at start (1.0 = fully rigid)
+    flb=1.0     # Rigid zone factor at end
+)
+```
+
+<Tip>
+  Use end offsets to model beam-column joints where the member extends into the joint region.
+</Tip>
+
+### Member Releases
+
+Create internal hinges or partial releases:
+
+```python
+model.add_releases(
+    member_id=1,
+    pi=False,  # Release axial force at start
+    vi=False,  # Release shear force at start
+    mi=True,   # Release moment at start (hinge)
+    pj=False,  # Release axial force at end
+    vj=False,  # Release shear force at end
+    mj=False   # Release moment at end
+)
+```
+
+<Accordion title="Common Release Patterns">
+  **Simple beam (both ends pinned):**
+  ```python
+  model.add_releases(member_id=1, mi=True, mj=True)
+  ```
+  
+  **Cantilever (free end):**
+  ```python
+  model.add_releases(member_id=1, pj=True, vj=True, mj=True)
+  ```
+  
+  **Axial release (truss-like):**
+  ```python
+  model.add_releases(member_id=1, mi=True, mj=True)
+  ```
+</Accordion>
+
+## Complete Example: Simple Frame
+
+```python
+from milcapy import SystemMilcaModel
+
+# Create model
+model = SystemMilcaModel()
+
+# Add material and section
+model.add_material(name="Concrete", modulus_elasticity=30e9, 
+                   poisson_ratio=0.2, specific_weight=24000)
+model.add_rectangular_section(name="COL-40x40", material_name="Concrete",
+                              base=0.40, height=0.40)
+model.add_rectangular_section(name="BEAM-30x50", material_name="Concrete",
+                              base=0.30, height=0.50)
+
+# Create nodes
+model.add_node(id=1, x=0.0, y=0.0)   # Left support
+model.add_node(id=2, x=0.0, y=4.0)   # Left top
+model.add_node(id=3, x=6.0, y=4.0)   # Right top
+model.add_node(id=4, x=6.0, y=0.0)   # Right support
+
+# Create columns
+model.add_member(id=1, node_i_id=1, node_j_id=2, 
+                section_name="COL-40x40", beam_theory="TIMOSHENKO")
+model.add_member(id=2, node_i_id=4, node_j_id=3,
+                section_name="COL-40x40", beam_theory="TIMOSHENKO")
+
+# Create beam
+model.add_member(id=3, node_i_id=2, node_j_id=3,
+                section_name="BEAM-30x50", beam_theory="TIMOSHENKO")
+
+# Add boundary conditions
+model.add_restraint(node_id=1, ux=True, uy=True, rz=True)  # Fixed
+model.add_restraint(node_id=4, ux=True, uy=True, rz=True)  # Fixed
+```
+
+## Best Practices
+
+<Warning>
+  **Unique IDs**: Each node and element must have a unique ID. Attempting to add duplicates will raise a `ValueError`.
+</Warning>
+
+<Tip>
+  **Node Ordering**: For membrane elements, always order nodes counter-clockwise when viewing from the positive z-axis.
+</Tip>
+
+<Tip>
+  **Element Connectivity**: Ensure nodes exist before creating elements that reference them.
+</Tip>
+
+<Note>
+  **Element Selection**: 
+  - Use **Timoshenko beams** for most frame analysis
+  - Use **trusses** for axial-only members
+  - Use **Q8 or Q6I** membrane elements for best accuracy
+  - Avoid **Q4** elements due to poor convergence
+</Note>
+
+## Related Concepts
+
+<CardGroup cols={2}>
+  <Card title="Materials & Sections" icon="flask" href="/concepts/materials-sections">
+    Define section properties for elements
+  </Card>
+  
+  <Card title="Boundary Conditions" icon="anchor" href="/concepts/boundary-conditions">
+    Apply supports and restraints to nodes
+  </Card>
+  
+  <Card title="Load Patterns" icon="weight-hanging" href="/concepts/load-patterns">
+    Apply loads to nodes and elements
+  </Card>
+</CardGroup>

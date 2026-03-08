@@ -1,0 +1,345 @@
+---
+title: "CST Membrane Element"
+description: "Constant Strain Triangle element for 2D plane stress and plane strain analysis"
+---
+
+## Overview
+
+The CST (Constant Strain Triangle) element is the most basic 2D finite element for membrane analysis. It features:
+
+- **3 nodes** forming a triangular element
+- **Constant strain** within the element
+- **2 DOF per node** (translations in x and y)
+- Simple formulation ideal for basic meshing
+
+<Info>
+CST elements are best used in refined meshes or as filler elements in complex geometries. For better accuracy with fewer elements, consider Q4, Q6, Q6i, or Q8 elements.
+</Info>
+
+## Adding CST Elements
+
+```python
+from milcapy.utils.types import ConstitutiveModel
+
+model.add_cst(
+    id=1,
+    node_ids=[1, 2, 3],
+    section_name='Shell_10mm',
+    state=ConstitutiveModel.PLANE_STRESS
+)
+```
+
+**Parameters:**
+- `id` (int) → Element ID
+- `node_ids` (list[int]) → List of 3 node IDs
+- `section_name` (str) → Section name (shell/membrane section)
+- `state` (ConstitutiveModel, optional) → Constitutive model
+
+**Available constitutive models:**
+- `'PLANE_STRESS'` or `ConstitutiveModel.PLANE_STRESS` (default)
+- `'PLANE_STRAIN'` or `ConstitutiveModel.PLANE_STRAIN`
+
+<Warning>
+**Critical:** Node IDs must be ordered **counter-clockwise** to ensure correct element formulation and positive area.
+</Warning>
+
+## Node Ordering
+
+Proper node numbering is essential:
+
+```
+        3
+       /|\
+      / | \
+     /  |  \
+    /   |   \
+   /    |    \
+  /     |     \
+ 1 -----+------ 2
+
+Counter-clockwise: [1, 2, 3] ✓
+Clockwise: [1, 3, 2] ✗
+```
+
+<Tip>
+You can verify proper ordering by checking that the computed element area is positive.
+</Tip>
+
+## Degrees of Freedom
+
+Each node has 2 translational DOF:
+
+```
+Node 1: [Ux1, Uy1]
+Node 2: [Ux2, Uy2]  
+Node 3: [Ux3, Uy3]
+```
+
+Total: 6 DOF per element
+
+## Constitutive Models
+
+### Plane Stress
+
+Use for **thin structures** where stress through the thickness is negligible:
+- Thin plates
+- Shells
+- Membranes
+
+```python
+state = ConstitutiveModel.PLANE_STRESS
+```
+
+Constitutive matrix:
+
+```
+D = (E / (1 - v²)) * [[1,   v,       0      ],
+                      [v,   1,       0      ],
+                      [0,   0,   (1-v)/2   ]]
+```
+
+### Plane Strain
+
+Use for **thick structures** where strain through thickness is constrained:
+- Dams
+- Retaining walls
+- Long structures (perpendicular to plane)
+
+```python
+state = ConstitutiveModel.PLANE_STRAIN
+```
+
+Constitutive matrix:
+
+```
+k = E(1-v) / ((1+v)(1-2v))
+
+D = k * [[1,         v/(1-v),              0           ],
+         [v/(1-v),   1,                    0           ],
+         [0,         0,        (1-2v)/(2(1-v))         ]]
+```
+
+## Element Formulation
+
+### Strain-Displacement Matrix (B)
+
+The CST element has constant strain, computed as:
+
+```python
+B = (1/(2*A)) * [[b1,  0, b2,  0, b3,  0],
+                 [ 0, c1,  0, c2,  0, c3],
+                 [c1, b1, c2, b2, c3, b3]]
+```
+
+Where:
+- `A` = Element area
+- `b1 = y2 - y3`, `b2 = y3 - y1`, `b3 = y1 - y2`
+- `c1 = x3 - x2`, `c2 = x1 - x3`, `c3 = x2 - x1`
+
+### Element Area
+
+```python
+A = 0.5 * (x1*(y2-y3) + x2*(y3-y1) + x3*(y1-y2))
+```
+
+<Note>
+If area is negative, nodes are ordered clockwise—reverse the node order.
+</Note>
+
+### Stiffness Matrix
+
+The element stiffness matrix (6×6):
+
+```
+K = B^T * D * B * t * A
+```
+
+Where:
+- `B` = Strain-displacement matrix (3×6)
+- `D` = Constitutive matrix (3×3)
+- `t` = Thickness
+- `A` = Element area
+
+## Element Loads
+
+You can apply surface loads to CST elements:
+
+```python
+from milcapy.loads.load import CSTLoad
+import numpy as np
+
+# Set current load pattern
+element.set_current_load_pattern('Pressure')
+
+# Create equivalent nodal forces
+# For uniform pressure p, distribute to nodes
+Feq = np.array([Fx1, Fy1, Fx2, Fy2, Fx3, Fy3])
+
+load = CSTLoad(Feq=Feq)
+element.set_load(load)
+```
+
+## Example: Simple Plate
+
+```python
+import milcapy as mx
+from milcapy.utils.types import ConstitutiveModel
+
+# Create model
+model = mx.Model()
+
+# Define nodes for a rectangular plate (2 triangles)
+model.add_node(1, 0, 0)
+model.add_node(2, 1, 0)
+model.add_node(3, 1, 1)
+model.add_node(4, 0, 1)
+
+# Material and section
+model.add_material('Aluminum', E=70e9, v=0.33, rho=2700)
+model.add_shell_section('Plate_5mm', material='Aluminum', t=0.005)
+
+# Add CST elements (counter-clockwise)
+model.add_cst(
+    id=1,
+    node_ids=[1, 2, 3],  # Lower triangle
+    section_name='Plate_5mm',
+    state=ConstitutiveModel.PLANE_STRESS
+)
+
+model.add_cst(
+    id=2,
+    node_ids=[1, 3, 4],  # Upper triangle  
+    section_name='Plate_5mm',
+    state=ConstitutiveModel.PLANE_STRESS
+)
+
+# Boundary conditions
+model.add_support(node_id=1, ux=True, uy=True)
+model.add_support(node_id=2, ux=True, uy=True)
+
+# Apply loads
+model.add_load_pattern('Pressure')
+model.add_nodal_load(node_id=3, fx=0, fy=1000)
+model.add_nodal_load(node_id=4, fx=0, fy=1000)
+
+# Solve
+model.solve('Pressure')
+```
+
+## Example: Mesh Refinement
+
+```python
+import numpy as np
+
+# Create a refined mesh of CST elements
+def create_cst_mesh(model, width, height, nx, ny, section_name):
+    """
+    Create a structured CST mesh
+    
+    Args:
+        model: Milcapy model
+        width: Total width
+        height: Total height  
+        nx: Number of divisions in x
+        ny: Number of divisions in y
+        section_name: Section to use
+    """
+    dx = width / nx
+    dy = height / ny
+    
+    # Create nodes
+    node_id = 1
+    node_map = {}
+    for j in range(ny + 1):
+        for i in range(nx + 1):
+            x = i * dx
+            y = j * dy
+            model.add_node(node_id, x, y)
+            node_map[(i, j)] = node_id
+            node_id += 1
+    
+    # Create elements
+    elem_id = 1
+    for j in range(ny):
+        for i in range(nx):
+            n1 = node_map[(i, j)]
+            n2 = node_map[(i+1, j)]
+            n3 = node_map[(i+1, j+1)]
+            n4 = node_map[(i, j+1)]
+            
+            # Lower triangle
+            model.add_cst(elem_id, [n1, n2, n3], section_name)
+            elem_id += 1
+            
+            # Upper triangle  
+            model.add_cst(elem_id, [n1, n3, n4], section_name)
+            elem_id += 1
+
+# Usage
+model = mx.Model()
+model.add_material('Steel', E=200e9, v=0.3, rho=7850)
+model.add_shell_section('Plate', material='Steel', t=0.01)
+
+create_cst_mesh(model, width=2.0, height=1.0, nx=10, ny=5, 
+                section_name='Plate')
+```
+
+## Advantages and Limitations
+
+<CardGroup cols={2}>
+
+<Card title="Advantages" icon="check">
+  - Simple formulation
+  - Always stable
+  - Good for complex geometries
+  - Easy to generate meshes
+  - Low computational cost per element
+</Card>
+
+<Card title="Limitations" icon="triangle-exclamation">
+  - Constant strain (poor accuracy)
+  - Requires fine mesh
+  - Cannot represent bending well
+  - Slow convergence
+  - Overly stiff in bending
+</Card>
+
+</CardGroup>
+
+## When to Use CST Elements
+
+**Good for:**
+- Quick preliminary analysis
+- Filler elements in transition zones  
+- Very fine meshes
+- Simple educational examples
+
+**Not recommended for:**
+- Coarse meshes
+- Bending-dominated problems
+- Final design analysis
+- High accuracy requirements
+
+<Tip>
+For better accuracy, use Q6, Q6i, or Q8 elements which converge much faster with coarser meshes.
+</Tip>
+
+## Stress and Strain Recovery
+
+Since strain is constant in the element:
+
+```python
+# Element strain
+epsilon = B @ u_element  # [εx, εy, γxy]
+
+# Element stress  
+sigma = D @ epsilon      # [σx, σy, τxy]
+
+# Von Mises stress
+sigma_vm = np.sqrt(sigma[0]**2 - sigma[0]*sigma[1] + 
+                   sigma[1]**2 + 3*sigma[2]**2)
+```
+
+<Warning>
+Stress and strain are constant throughout the element. For better stress distribution, use higher-order elements or refine the mesh.
+</Warning>

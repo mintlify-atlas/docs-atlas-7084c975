@@ -1,0 +1,59 @@
+---
+title: 'add_node()'
+description: 'Add a node to the structural model'
+---
+
+Add a node to the structural model at specified coordinates.
+
+## Syntax
+
+```python
+model.add_node(id, x, y)
+```
+
+## Parameters
+
+<ParamField path="id" type="int" required>
+  Unique identifier for the node. Node IDs must be sequential and ordered (1, 2, 3, ...).
+</ParamField>
+
+<ParamField path="x" type="float" required>
+  X-coordinate of the node in the global coordinate system.
+</ParamField>
+
+<ParamField path="y" type="float" required>
+  Y-coordinate of the node in the global coordinate system.
+</ParamField>
+
+## Returns
+
+Returns a `Node` object representing the created node.
+
+## Raises
+
+- `ValueError`: If a node with the same ID already exists.
+
+## Example
+
+```python
+import milcapy as milca
+
+# Create a model
+model = milca.SystemMilcaModel()
+
+# Add nodes to the model
+model.add_node(1, 0.0, 0.0)    # Node at origin
+model.add_node(2, 5.0, 0.0)    # Node at x=5
+model.add_node(3, 5.0, 3.0)    # Node at x=5, y=3
+model.add_node(4, 0.0, 3.0)    # Node at y=3
+```
+
+<Warning>
+  Node IDs must be sequential and ordered (1, 2, 3, ...). Non-sequential IDs may cause errors in the analysis.
+</Warning>
+
+## Related
+
+- [add_member()](/api/members) - Add frame/beam elements
+- [add_truss()](/api/trusses) - Add truss elements
+- [add_cst()](/api/membranes) - Add membrane elements

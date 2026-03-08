@@ -1,0 +1,378 @@
+---
+title: "Q6i Membrane Element"
+description: "4-node quadrilateral with incompatible modes to avoid shear locking"
+---
+
+## Overview
+
+The Q6i (Quadrilateral with 6 Incompatible modes) membrane element is a 4-node quadrilateral featuring:
+
+- **4 corner nodes**
+- **2 DOF per node** (translations in x and y)
+- **2 internal incompatible modes** (condensed out)
+- **Prevents shear locking** in bending-dominated problems
+- Converges to Timoshenko beam solution (includes shear deformation)
+
+<Info>
+The Q6i element uses incompatible modes that are statically condensed at the element level, resulting in enhanced bending behavior without adding global DOF.
+</Info>
+
+## Adding Q6i Elements
+
+```python
+from milcapy.utils.types import ConstitutiveModel
+
+model.add_membrane_q6i(
+    id=1,
+    node_ids=[1, 2, 3, 4],
+    section_name='Shell_10mm',
+    state=ConstitutiveModel.PLANE_STRESS
+)
+```
+
+**Parameters:**
+- `id` (int) → Element ID
+- `node_ids` (list[int]) → List of 4 node IDs
+- `section_name` (str) → Section name (shell/membrane section)
+- `state` (ConstitutiveModel, optional) → Constitutive model
+
+**Available constitutive models:**
+- `'PLANE_STRESS'` or `ConstitutiveModel.PLANE_STRESS` (default)
+- `'PLANE_STRAIN'` or `ConstitutiveModel.PLANE_STRAIN`
+
+<Warning>
+**Critical:** Nodes must be ordered **counter-clockwise** for correct formulation.
+</Warning>
+
+## Node Ordering
+
+```
+4 ----------- 3
+|             |
+|             |
+|      ·      |  
+|             |
+|             |
+1 ----------- 2
+
+Order: [1, 2, 3, 4] ✓ (counter-clockwise)
+```
+
+## Degrees of Freedom
+
+Each node has 2 translational DOF:
+
+```
+Node 1: [Ux1, Uy1]
+Node 2: [Ux2, Uy2]
+Node 3: [Ux3, Uy3]
+Node 4: [Ux4, Uy4]
+```
+
+Total: **8 DOF** (same as Q4, but with enhanced formulation)
+
+**Internal modes:** 2 additional incompatible modes (condensed)
+
+<Note>
+The incompatible modes improve element performance but are eliminated through static condensation, so they don't appear in the global system.
+</Note>
+
+## Element Formulation
+
+### Shape Functions
+
+**Standard bilinear modes (4):**
+```python
+N1 = (1-ξ)*(1-η)/4
+N2 = (1+ξ)*(1-η)/4
+N3 = (1+ξ)*(1+η)/4
+N4 = (1-ξ)*(1-η)/4
+```
+
+**Incompatible modes (2):**
+```python
+N5 = (1-ξ²)  # Incompatible in ξ direction
+N6 = (1-η²)  # Incompatible in η direction
+```
+
+Total: **6 shape functions** (4 compatible + 2 incompatible)
+
+### Enhanced B Matrix
+
+The strain-displacement matrix includes incompatible modes:
+
+```python
+B = [B_compatible | B_incompatible]
+```
+
+Where:
+- `B_compatible` (3×8): Standard displacement DOF
+- `B_incompatible` (3×2): Internal modes
+
+Full B matrix before condensation: 3×10
+
+### Static Condensation
+
+The incompatible modes are eliminated at the element level:
+
+```python
+# 12×12 stiffness with internal modes
+K_full = [[K_cc,  K_cs],
+          [K_sc,  K_ss]]
+
+# Condensed 8×8 stiffness
+K_condensed = K_cc - K_cs @ inv(K_ss) @ K_sc
+```
+
+The final element stiffness matrix is 8×8 (same size as Q4).
+
+<Tip>
+Static condensation happens automatically. You don't need to handle internal modes—they're transparent to the user.
+</Tip>
+
+## Key Features
+
+### Shear Locking Prevention
+
+<CardGroup cols={2}>
+
+<Card title="What is Shear Locking?" icon="lock">
+  Overly stiff behavior in bending due to spurious shear strain in low-order elements.
+</Card>
+
+<Card title="How Q6i Helps" icon="unlock">
+  Incompatible modes allow the element to bend without artificial shear constraints.
+</Card>
+
+</CardGroup>
+
+### Convergence to Timoshenko Theory
+
+<Info>
+Unlike Q6 (which converges to Euler-Bernoulli), the **Q6i converges to Timoshenko beam theory**, accounting for shear deformation effects.
+</Info>
+
+This makes Q6i ideal for:
+- Moderately thick beams
+- Short spans
+- Structures where shear deformation is significant
+
+## Example: Deep Beam Analysis
+
+```python
+import milcapy as mx
+from milcapy.utils.types import ConstitutiveModel
+
+# Model a deep beam where shear deformation matters
+model = mx.Model()
+
+# Deep beam: 3m long × 0.6m deep
+L = 3.0
+h = 0.6
+
+# Nodes
+model.add_node(1, 0.0, 0.0)
+model.add_node(2, L, 0.0)
+model.add_node(3, L, h)
+model.add_node(4, 0.0, h)
+
+# Material and section
+model.add_material('Concrete', E=25e9, v=0.2, rho=2400)
+model.add_shell_section('Wall', material='Concrete', t=0.25)
+
+# Add Q6i element (single element for demonstration)
+model.add_membrane_q6i(
+    id=1,
+    node_ids=[1, 2, 3, 4],
+    section_name='Wall',
+    state=ConstitutiveModel.PLANE_STRESS
+)
+
+# Simply supported
+model.add_support(node_id=1, ux=True, uy=True)
+model.add_support(node_id=2, ux=False, uy=True)
+
+# Point load at top center
+model.add_load_pattern('Live')
+model.add_nodal_load(node_id=3, fx=0, fy=-6000)  # 6 kN
+
+# Solve
+model.solve('Live')
+
+# Results
+disp = model.get_node_displacements(3)
+print(f"Deflection: {abs(disp[1])*1000:.3f} mm")
+```
+
+<Note>
+For this deep beam (L/h = 5), shear deformation is significant. Q6i will give more accurate results than Q6 or standard Q4.
+</Note>
+
+## Example: Comparison Study
+
+```python
+import milcapy as mx
+from milcapy.utils.types import ConstitutiveModel
+
+def analyze_beam(element_type):
+    """
+    Compare Q4, Q6, Q6i, and Q8 elements
+    
+    Args:
+        element_type: 'Q4', 'Q6', 'Q6i', or 'Q8'
+    """
+    model = mx.Model()
+    
+    # Cantilever beam: 2m × 0.4m
+    model.add_node(1, 0.0, 0.0)
+    model.add_node(2, 2.0, 0.0)
+    model.add_node(3, 2.0, 0.4)
+    model.add_node(4, 0.0, 0.4)
+    
+    # Material
+    model.add_material('Steel', E=200e9, v=0.3, rho=7850)
+    model.add_shell_section('Beam', material='Steel', t=0.05)
+    
+    # Add element based on type
+    if element_type == 'Q4':
+        model.add_membrane_q4(1, [1,2,3,4], 'Beam', 
+                             ConstitutiveModel.PLANE_STRESS)
+    elif element_type == 'Q6':
+        model.add_membrane_q6(1, [1,2,3,4], 'Beam',
+                             ConstitutiveModel.PLANE_STRESS)
+    elif element_type == 'Q6i':
+        model.add_membrane_q6i(1, [1,2,3,4], 'Beam',
+                              ConstitutiveModel.PLANE_STRESS)
+    elif element_type == 'Q8':
+        model.add_membrane_q8(1, [1,2,3,4], 'Beam',
+                             ConstitutiveModel.PLANE_STRESS,
+                             IntegrationType.REDUCED)
+    
+    # Fixed support
+    if element_type == 'Q6':
+        model.add_support(1, ux=True, uy=True, rz=True)
+        model.add_support(4, ux=True, uy=True, rz=True)
+    else:
+        model.add_support(1, ux=True, uy=True)
+        model.add_support(4, ux=True, uy=True)
+    
+    # Tip load
+    model.add_load_pattern('P')
+    model.add_nodal_load(3, fx=0, fy=-1000)
+    
+    model.solve('P')
+    disp = model.get_node_displacements(3)
+    
+    return abs(disp[1]) * 1000  # mm
+
+# Compare elements
+for elem in ['Q4', 'Q6', 'Q6i', 'Q8']:
+    deflection = analyze_beam(elem)
+    print(f"{elem:4s}: {deflection:.4f} mm")
+```
+
+Expected behavior:
+- **Q4**: Stiff (shear locking)
+- **Q6**: Less stiff (no shear deformation modeled)
+- **Q6i**: Accounts for shear (most realistic for deep beams)
+- **Q8**: Best accuracy overall
+
+## Constitutive Models
+
+### Plane Stress
+
+```python
+state = ConstitutiveModel.PLANE_STRESS
+
+D = (E/(1-v²)) * [[1,   v,       0      ],
+                  [v,   1,       0      ],
+                  [0,   0,   (1-v)/2   ]]
+```
+
+### Plane Strain
+
+```python
+state = ConstitutiveModel.PLANE_STRAIN
+
+k = E(1-v)/((1+v)(1-2v))
+D = k * [[1,         v/(1-v),              0           ],
+         [v/(1-v),   1,                    0           ],
+         [0,         0,        (1-2v)/(2(1-v))         ]]
+```
+
+## Advantages and Limitations
+
+### Advantages
+- **Eliminates shear locking** in bending problems
+- **Timoshenko beam convergence** (includes shear deformation)
+- **Same DOF as Q4** (no extra global unknowns)
+- Better single-element accuracy than Q4
+- Ideal for moderately thick beams and plates
+- Good for coarse meshes
+
+### Limitations
+- More complex formulation than Q4
+- Slightly higher computational cost per element
+- Not as accurate as Q8 for very coarse meshes
+- Requires careful implementation of condensation
+
+<Warning>
+If static condensation fails (singular K_ss), the element falls back to standard Q4 formulation.
+</Warning>
+
+## When to Use Q6i Elements
+
+**Best for:**
+- **Thick beams and plates** (L/h < 10)
+- Structures where **shear deformation** is important
+- Avoiding shear locking in coarse meshes
+- Single or few elements spanning a member
+- Deep beam analysis
+
+**Consider alternatives:**
+- **Q4**: For refined meshes where shear locking isn't an issue
+- **Q6**: For slender beams where shear deformation is negligible
+- **Q8**: For highest accuracy (but more DOF and integration points)
+
+## Element Comparison
+
+| Feature | Q4 | Q6 | Q6i | Q8 |
+|---------|----|----|-----|----|
+| DOF/node | 2 | 3 | 2 | 2 |
+| Total DOF | 8 | 12 | 8 | 8 |
+| Internal modes | 0 | 0 | 2 (condensed) | 4 (condensed) |
+| Shear locking | Yes | No (drilling) | No (incompatible) | No |
+| Beam theory | - | Euler-Bernoulli | Timoshenko | - |
+| Integration points | 4 | 4 | 4 | 4 or 9 |
+| Best for | Refined mesh | General, slender | Thick, shear | Best accuracy |
+
+<Tip>
+**Choosing between Q6 and Q6i:**
+- Use **Q6** for slender structures (shear deformation negligible)
+- Use **Q6i** for thick/deep structures (shear deformation important)
+</Tip>
+
+## Technical Details
+
+### Incompatible Mode Formulation
+
+The incompatible modes satisfy:
+1. Orthogonality to rigid body modes
+2. Zero contribution to constant strain states
+3. Enhanced flexibility in bending
+
+### Numerical Integration
+
+4-point Gauss quadrature:
+```python
+ξ = η = ±1/√3
+weights = [1, 1, 1, 1]
+```
+
+### Patch Test
+
+The Q6i element passes the patch test (constant strain reproducing capability) despite having incompatible modes, thanks to proper formulation.
+
+<Info>
+**Historical note:** Incompatible mode elements were developed by Wilson et al. to overcome shear locking while maintaining simplicity.
+</Info>

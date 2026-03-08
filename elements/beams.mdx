@@ -1,0 +1,233 @@
+---
+title: "Beam Elements"
+description: "Timoshenko and Euler-Bernoulli beam elements for structural frame analysis"
+---
+
+## Overview
+
+Milcapy provides two beam element formulations for structural frame analysis:
+
+- **Timoshenko Beam**: Accounts for shear deformation (recommended for most cases)
+- **Euler-Bernoulli Beam**: Classical beam theory without shear deformation
+
+Both elements are 2D frame elements with 3 degrees of freedom (DOF) per node:
+- Translation in `x` direction
+- Translation in `y` direction  
+- Rotation about `z` axis
+
+<Note>
+The Timoshenko beam theory is more accurate for deep beams and higher modes of vibration as it includes shear deformation effects.
+</Note>
+
+## Adding Beam Elements
+
+### General Method (Specify Theory)
+
+```python
+from milcapy.utils.types import BeamTheoriesType
+
+model.add_member(
+    id=1,
+    node_i_id=1,
+    node_j_id=2,
+    section_name='W14x22',
+    beam_theory=BeamTheoriesType.TIMOSHENKO
+)
+```
+
+**Parameters:**
+- `id` (int) → Member ID
+- `node_i_id` (int) → Initial node ID
+- `node_j_id` (int) → Final node ID  
+- `section_name` (str) → Section name
+- `beam_theory` (BeamTheoriesType or str, optional) → Beam theory to use
+
+**Available beam theories:**
+- `'TIMOSHENKO'` or `BeamTheoriesType.TIMOSHENKO`
+- `'EULER_BERNOULLI'` or `BeamTheoriesType.EULER_BERNOULLI`
+
+### Timoshenko Beam (Direct Method)
+
+```python
+model.add_elastic_timoshenko_beam(
+    id=1,
+    node_i_id=1,
+    node_j_id=2,
+    section_name='W14x22'
+)
+```
+
+The Timoshenko beam element includes:
+- Axial deformation
+- Bending deformation
+- Shear deformation (characterized by the parameter φ)
+
+### Euler-Bernoulli Beam (Direct Method)
+
+```python
+model.add_elastic_euler_bernoulli_beam(
+    id=1,
+    node_i_id=1,
+    node_j_id=2,
+    section_name='W14x22'
+)
+```
+
+The Euler-Bernoulli beam element includes:
+- Axial deformation
+- Bending deformation
+- No shear deformation (φ = 0)
+
+## Degrees of Freedom
+
+Each node has 3 DOF in the global coordinate system:
+
+```
+Node i: [Uxi, Uyi, Rzi]
+Node j: [Uxj, Uyj, Rzj]
+```
+
+Where:
+- `Ux` = Displacement in x direction
+- `Uy` = Displacement in y direction
+- `Rz` = Rotation about z axis
+
+## Advanced Features
+
+### Rigid End Offsets
+
+You can model rigid end zones at beam connections:
+
+```python
+member.la = 0.5  # Rigid offset length at node i
+member.lb = 0.3  # Rigid offset length at node j
+member.fla = 1.0  # Offset factor at node i (default: 1.0)
+member.flb = 1.0  # Offset factor at node j (default: 1.0)
+```
+
+### Member Releases
+
+Release specific DOF at member ends to model pins, rollers, or other connections:
+
+```python
+member.add_releases(
+    uxi=False,  # Release axial DOF at node i
+    uyi=False,  # Release vertical DOF at node i
+    rzi=True,   # Release rotation at node i (pin connection)
+    uxj=False,
+    uyj=False,
+    rzj=False
+)
+```
+
+<Tip>
+Releasing `rzi=True` creates a pinned connection at node i, while releasing both `rzi=True` and `rzj=True` creates a simply supported beam.
+</Tip>
+
+### Distributed Loads
+
+Apply distributed loads along beam members:
+
+```python
+from milcapy.loads.load import DistributedLoad
+
+member.set_current_load_pattern('Dead Load')
+member.set_distributed_load(DistributedLoad(
+    q_i=-10.0,  # Transverse load at node i (force/length)
+    q_j=-10.0,  # Transverse load at node j
+    p_i=0.0,    # Axial load at node i
+    p_j=0.0     # Axial load at node j
+))
+```
+
+## When to Use Each Theory
+
+<CardGroup cols={2}>
+
+<Card title="Timoshenko Beam" icon="arrows-maximize">
+  **Use when:**
+  - Beam depth/length ratio > 1/10
+  - Analyzing deep beams or short spans
+  - Shear deformation is significant
+  - Higher accuracy is needed
+  - **Recommended for most cases**
+</Card>
+
+<Card title="Euler-Bernoulli Beam" icon="arrows-left-right">
+  **Use when:**
+  - Beam is slender (depth/length < 1/10)
+  - Long span beams
+  - Shear deformation is negligible
+  - Classical beam theory is acceptable
+</Card>
+
+</CardGroup>
+
+## Technical Details
+
+### Shear Deformation Parameter (φ)
+
+For Timoshenko beams, the shear parameter is calculated as:
+
+```
+φ = (12 * E * I) / (L² * A * k * G)
+```
+
+Where:
+- `E` = Young's modulus
+- `I` = Moment of inertia
+- `L` = Member length
+- `A` = Cross-sectional area
+- `k` = Shear correction factor
+- `G` = Shear modulus
+
+For Euler-Bernoulli beams: φ = 0
+
+### Transformation Matrix
+
+The local-to-global transformation is computed based on the member orientation angle θ:
+
+```python
+θ = atan2(yj - yi, xj - xi)
+T = transformation_matrix(angle=θ)
+```
+
+### Stiffness Matrix
+
+The global stiffness matrix is computed as:
+
+```
+K_global = T^T * K_local * T
+```
+
+Where `K_local` is the 6×6 local stiffness matrix including axial, bending, and shear effects (for Timoshenko).
+
+## Example: Simple Frame
+
+```python
+import milcapy as mx
+from milcapy.utils.types import BeamTheoriesType
+
+# Create model
+model = mx.Model()
+
+# Define nodes
+model.add_node(1, 0, 0)
+model.add_node(2, 5, 0)
+model.add_node(3, 5, 3)
+
+# Define material and section
+model.add_material('Steel', E=200e9, v=0.3, rho=7850)
+model.add_section('W14x22', material='Steel', A=0.0042, I=2.09e-5, k=0.4)
+
+# Add beam members with Timoshenko theory
+model.add_member(1, 1, 2, 'W14x22', beam_theory=BeamTheoriesType.TIMOSHENKO)
+model.add_member(2, 2, 3, 'W14x22', beam_theory=BeamTheoriesType.TIMOSHENKO)
+
+# Or use direct methods
+model.add_elastic_timoshenko_beam(3, 3, 1, 'W14x22')
+```
+
+<Warning>
+Always ensure node ordering is correct. The member is oriented from `node_i` to `node_j`, which affects the local coordinate system and load direction.
+</Warning>

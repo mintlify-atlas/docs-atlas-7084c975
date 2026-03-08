@@ -1,122 +1,139 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "milcapy",
+  "theme": "aspen",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#94cb04",
+    "light": "#545454",
+    "dark": "#94cb04"
   },
-  "favicon": "/favicon.svg",
+  "favicon": "/logo.png",
+  "logo": {
+    "light": "/logo.png",
+    "dark": "/logo.png"
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/amachacca/milcapy"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/amachacca/milcapy"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Getting Started",
             "pages": [
-              "index",
-              "quickstart",
-              "development"
+              "introduction",
+              "installation",
+              "quickstart"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Core Concepts",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "concepts/model",
+              "concepts/materials-sections",
+              "concepts/nodes-elements",
+              "concepts/load-patterns",
+              "concepts/boundary-conditions"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Elements",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "elements/beams",
+              "elements/trusses",
+              "elements/membrane-cst",
+              "elements/membrane-q4",
+              "elements/membrane-q6",
+              "elements/membrane-q6i",
+              "elements/membrane-q8"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "Analysis",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "analysis/solving",
+              "analysis/results",
+              "analysis/visualization"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "advanced/end-offsets",
+              "advanced/releases",
+              "advanced/elastic-supports",
+              "advanced/local-axes"
+            ]
+          },
+          {
+            "group": "Examples",
+            "pages": [
+              "examples/simple-portal",
+              "examples/truss-analysis",
+              "examples/membrane-analysis"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "API Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Core API",
             "pages": [
-              "api-reference/introduction"
+              "api/system-model",
+              "api/model-viewer"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Materials & Sections",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "api/materials",
+              "api/sections"
+            ]
+          },
+          {
+            "group": "Nodes & Elements",
+            "pages": [
+              "api/nodes",
+              "api/members",
+              "api/trusses",
+              "api/membranes"
+            ]
+          },
+          {
+            "group": "Loads & Boundary Conditions",
+            "pages": [
+              "api/load-patterns",
+              "api/loads",
+              "api/restraints"
+            ]
+          },
+          {
+            "group": "Analysis & Results",
+            "pages": [
+              "api/solve",
+              "api/results"
+            ]
+          },
+          {
+            "group": "Enums & Types",
+            "pages": [
+              "api/enums"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

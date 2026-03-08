@@ -1,0 +1,340 @@
+---
+title: "Q6 Membrane Element"
+description: "4-node quadrilateral with drilling degrees of freedom for enhanced bending stiffness"
+---
+
+## Overview
+
+The Q6 (Quadrilateral with 6 DOF) membrane element is an enhanced 4-node element featuring:
+
+- **4 corner nodes**
+- **3 DOF per node**: translations (x, y) + rotation (z)
+- **Drilling rotation** to prevent numerical instability
+- **Enhanced bending representation**
+- Converges to Euler-Bernoulli beam solution for beam-like structures
+
+<Info>
+The Q6 element adds rotational DOF ("drilling" degrees of freedom) to improve element compatibility and avoid spurious singular modes in shell-like structures.
+</Info>
+
+## Adding Q6 Elements
+
+```python
+from milcapy.utils.types import ConstitutiveModel
+
+model.add_membrane_q6(
+    id=1,
+    node_ids=[1, 2, 3, 4],
+    section_name='Shell_10mm',
+    state=ConstitutiveModel.PLANE_STRESS
+)
+```
+
+**Parameters:**
+- `id` (int) → Element ID
+- `node_ids` (list[int]) → List of 4 node IDs
+- `section_name` (str) → Section name (shell/membrane section)
+- `state` (ConstitutiveModel, optional) → Constitutive model
+
+**Available constitutive models:**
+- `'PLANE_STRESS'` or `ConstitutiveModel.PLANE_STRESS` (default)
+- `'PLANE_STRAIN'` or `ConstitutiveModel.PLANE_STRAIN`
+
+<Warning>
+**Critical:** Nodes must be ordered **counter-clockwise** for correct formulation.
+</Warning>
+
+## Node Ordering
+
+```
+4 ----------- 3
+|             |
+|             |
+|      ·      |  
+|             |
+|             |
+1 ----------- 2
+
+Order: [1, 2, 3, 4] ✓ (counter-clockwise)
+```
+
+## Degrees of Freedom
+
+Each node has **3 DOF**:
+
+```
+Node 1: [Ux1, Uy1, Rz1]
+Node 2: [Ux2, Uy2, Rz2]
+Node 3: [Ux3, Uy3, Rz3]
+Node 4: [Ux4, Uy4, Rz4]
+```
+
+Total: **12 DOF** per element
+
+Where:
+- `Ux`, `Uy` = Translations in x and y
+- `Rz` = Rotation about z-axis ("drilling" rotation)
+
+<Note>
+The drilling rotation (Rz) provides enhanced stiffness against in-plane rotation and improves element behavior in shell-like problems.
+</Note>
+
+## Element Formulation
+
+### Shape Functions
+
+The Q6 element uses:
+
+**For displacement DOF (bilinear):**
+```python
+N1 = (1-ξ)*(1-η)/4
+N2 = (1+ξ)*(1-η)/4  
+N3 = (1+ξ)*(1+η)/4
+N4 = (1-ξ)*(1+η)/4
+```
+
+**For rotational DOF (enhanced):**
+```python
+N5 = (1-ξ²)*(1-η)/2  # Additional modes
+N6 = (1-η²)*(1+ξ)/2
+N7 = (1-ξ²)*(1+η)/2
+N8 = (1-η²)*(1-ξ)/2
+```
+
+Total: **8 shape functions** (4 bilinear + 4 quadratic)
+
+### Strain-Displacement Relationship
+
+The B matrix is partitioned:
+
+```python
+B = [B_disp | B_rot]
+```
+
+Where:
+- `B_disp` (3×8): Relates strain to translational DOF
+- `B_rot` (3×4): Relates strain to rotational DOF
+
+Full B matrix: 3×12
+
+### Stiffness Matrix
+
+The 12×12 stiffness matrix:
+
+```python
+K = Σ (B^T @ D @ B * det(J) * t * w_i)
+```
+
+Integrated using 4-point Gauss quadrature.
+
+The DOF ordering after assembly:
+```
+[Ux1, Uy1, Rz1, Ux2, Uy2, Rz2, Ux3, Uy3, Rz3, Ux4, Uy4, Rz4]
+```
+
+## Key Features
+
+### Drilling Rotation Benefits
+
+<CardGroup cols={2}>
+
+<Card title="Stability" icon="shield-halved">
+  Eliminates spurious zero-energy modes in membrane assemblies.
+</Card>
+
+<Card title="Compatibility" icon="puzzle-piece">
+  Provides rotational compatibility with beam and shell elements.
+</Card>
+
+<Card title="Bending" icon="wave-sine">
+  Better represents in-plane bending without out-of-plane DOF.
+</Card>
+
+<Card title="Beam Behavior" icon="ruler-horizontal">
+  Converges to Euler-Bernoulli beam theory for slender structures.
+</Card>
+
+</CardGroup>
+
+### Convergence Properties
+
+<Info>
+The Q6 element converges to the **Euler-Bernoulli beam solution** for beam-like structures (without considering shear deformation).
+</Info>
+
+For structures where shear deformation is important, use Q6i instead.
+
+## Example: Cantilever Beam
+
+```python
+import milcapy as mx
+from milcapy.utils.types import ConstitutiveModel
+
+# Model a cantilever beam using Q6 membrane elements
+model = mx.Model()
+
+# Beam dimensions
+L = 2.0  # Length (m)
+h = 0.6  # Height (m)
+
+# Nodes
+model.add_node(1, 0, 0)
+model.add_node(2, L, 0)
+model.add_node(3, L, h)
+model.add_node(4, 0, h)
+
+# Material and section
+model.add_material('Concrete', E=25e9, v=0.2, rho=2400)
+model.add_shell_section('Wall', material='Concrete', t=0.4)
+
+# Add Q6 element
+model.add_membrane_q6(
+    id=1,
+    node_ids=[1, 2, 3, 4],
+    section_name='Wall',
+    state=ConstitutiveModel.PLANE_STRESS
+)
+
+# Fixed support at left edge
+model.add_support(node_id=1, ux=True, uy=True, rz=True)
+model.add_support(node_id=4, ux=True, uy=True, rz=True)
+
+# Apply tip load
+model.add_load_pattern('Lateral')
+model.add_nodal_load(node_id=3, fx=0, fy=-20000)  # 20 kN
+
+# Solve
+model.solve('Lateral')
+
+# Get results
+displacements = model.get_node_displacements(3)
+print(f"Tip deflection: {displacements[1]:.6f} m")
+```
+
+## Example: Plate Under Tension
+
+```python
+import milcapy as mx
+from milcapy.utils.types import ConstitutiveModel
+
+# Create model
+model = mx.Model()
+
+# Define plate (2m × 1m)
+def create_q6_mesh(nx, ny):
+    """Create structured Q6 mesh"""
+    width, height = 2.0, 1.0
+    dx, dy = width/nx, height/ny
+    
+    # Nodes
+    node_id = 1
+    node_map = {}
+    for j in range(ny + 1):
+        for i in range(nx + 1):
+            model.add_node(node_id, i*dx, j*dy)
+            node_map[(i,j)] = node_id
+            node_id += 1
+    
+    # Elements  
+    elem_id = 1
+    for j in range(ny):
+        for i in range(nx):
+            n1 = node_map[(i, j)]
+            n2 = node_map[(i+1, j)]
+            n3 = node_map[(i+1, j+1)]
+            n4 = node_map[(i, j+1)]
+            
+            model.add_membrane_q6(
+                id=elem_id,
+                node_ids=[n1, n2, n3, n4],
+                section_name='Plate',
+                state=ConstitutiveModel.PLANE_STRESS
+            )
+            elem_id += 1
+
+# Material and section
+model.add_material('Steel', E=200e9, v=0.3, rho=7850)
+model.add_shell_section('Plate', material='Steel', t=0.01)
+
+# Create mesh (4×2 elements)
+create_q6_mesh(nx=4, ny=2)
+
+# Boundary conditions and loads...
+```
+
+## Constitutive Models
+
+### Plane Stress
+
+```python
+state = ConstitutiveModel.PLANE_STRESS
+
+D = (E/(1-v²)) * [[1,   v,       0      ],
+                  [v,   1,       0      ],
+                  [0,   0,   (1-v)/2   ]]
+```
+
+Use for thin plates and shells.
+
+### Plane Strain
+
+```python
+state = ConstitutiveModel.PLANE_STRAIN
+
+k = E(1-v)/((1+v)(1-2v))
+D = k * [[1,         v/(1-v),              0           ],
+         [v/(1-v),   1,                    0           ],
+         [0,         0,        (1-2v)/(2(1-v))         ]]
+```
+
+Use for thick structures.
+
+## Advantages and Limitations
+
+### Advantages
+- **Enhanced stability** with drilling DOF
+- **Better bending behavior** than Q4
+- **Compatibility** with beam/shell elements
+- **Single element** can represent simple beams well
+- Eliminates spurious mechanisms
+- Good for shell-like structures
+
+### Limitations
+- More DOF than Q4 (higher computational cost)
+- Does **not** account for shear deformation
+- Converges to Euler-Bernoulli (not Timoshenko)
+- Still requires multiple elements for complex stress states
+
+<Note>
+**Recommendation:** The Q6 element is preferred over Q6i and Q6i-Modified for most applications due to its robust formulation.
+</Note>
+
+## When to Use Q6 Elements
+
+**Best for:**
+- Slender beam-like structures
+- Shell connections to membrane
+- Structures where drilling stiffness matters
+- Improved single-element accuracy
+- Avoiding spurious modes
+
+**Consider alternatives:**
+- **Q6i**: When shear deformation is important (thick beams)
+- **Q8**: When highest accuracy is needed
+- **Q4**: When minimal DOF is preferred and mesh is refined
+
+## Comparison with Other Elements
+
+| Feature | Q4 | Q6 | Q6i | Q8 |
+|---------|----|----|-----|----|
+| DOF/node | 2 | 3 | 2 | 2 |
+| Total DOF | 8 | 12 | 8 | 8 |
+| Drilling rotation | ❌ | ✅ | ❌ | ❌ |
+| Shear deformation | ❌ | ❌ | ✅ | ✅ |
+| Beam theory | - | Euler-Bernoulli | Timoshenko | - |
+| Single-element accuracy | Low | Medium | Medium | High |
+| Recommended | Refined mesh | General use | Thick beams | Best accuracy |
+
+<Tip>
+**General guideline:** Use Q6 as the default membrane element unless you specifically need shear deformation (Q6i) or maximum accuracy (Q8).
+</Tip>

@@ -1,0 +1,365 @@
+---
+title: Elastic Supports
+description: Model spring supports with elastic stiffness at nodes
+---
+
+## Overview
+
+Elastic supports allow you to model **spring supports** at nodes, where the support provides resistance proportional to displacement rather than fully restraining the node. This is essential for modeling foundations, soil-structure interaction, and flexible support conditions.
+
+Unlike rigid restraints that completely prevent displacement, elastic supports provide a **stiffness** that resists movement. The reaction force is proportional to the displacement: `R = k × δ`, where `k` is the spring stiffness and `δ` is the displacement.
+
+## When to Use Elastic Supports
+
+<CardGroup cols={2}>
+  <Card title="Foundation Springs" icon="house-foundation">
+    Model soil-structure interaction with foundation stiffness
+  </Card>
+  <Card title="Flexible Supports" icon="springs">
+    Represent supports that yield under load (e.g., rubber bearings)
+  </Card>
+  <Card title="Simplified Substructures" icon="diagram-project">
+    Replace complex substructures with equivalent springs
+  </Card>
+  <Card title="Isolation Systems" icon="wave-pulse">
+    Model seismic isolation or vibration isolation systems
+  </Card>
+</CardGroup>
+
+## Syntax
+
+```python
+model.add_elastic_support(
+    node_id,
+    kx=None,   # Stiffness in X direction
+    ky=None,   # Stiffness in Y direction
+    krz=None,  # Rotational stiffness about Z
+    CSys=CoordinateSystemType.GLOBAL  # Coordinate system
+)
+```
+
+### Parameters
+
+<ParamField path="node_id" type="int" required>
+  ID of the node to apply the elastic support to
+</ParamField>
+
+<ParamField path="kx" type="float" optional>
+  Spring stiffness in the X direction (force per unit length). If `None`, no spring is applied in X.
+</ParamField>
+
+<ParamField path="ky" type="float" optional>
+  Spring stiffness in the Y direction (force per unit length). If `None`, no spring is applied in Y.
+</ParamField>
+
+<ParamField path="krz" type="float" optional>
+  Rotational spring stiffness about the Z axis (moment per radian). If `None`, no rotational spring is applied.
+</ParamField>
+
+<ParamField path="CSys" type="str | CoordinateSystemType" default="GLOBAL">
+  Coordinate system for the spring directions:
+  - `'GLOBAL'` or `CoordinateSystemType.GLOBAL`: Springs oriented to global axes
+  - `'LOCAL'` or `CoordinateSystemType.LOCAL`: Springs oriented to local node axes
+</ParamField>
+
+<Note>
+Stiffness values should be in consistent units with your model. For example, if forces are in kN and lengths in meters, then:
+- `kx` and `ky` are in kN/m
+- `krz` is in kN·m/rad
+</Note>
+
+## Examples
+
+### Simple Foundation Spring
+
+Model a beam on an elastic foundation:
+
+```python
+from milcapy import SystemModel, BeamTheoriesType, CoordinateSystemType
+
+model = SystemModel()
+
+# Define material and section
+model.add_material("concrete", modulus_elasticity=2.1e6, poisson_ratio=0.2)
+model.add_rectangular_section("beam", "concrete", base=0.3, height=0.5)
+
+# Create beam
+model.add_node(1, 0, 0)
+model.add_node(2, 6, 0)
+model.add_member(1, 1, 2, "beam", BeamTheoriesType.EULER_BERNOULLI)
+
+# Add vertical spring support at mid-span
+model.add_node(3, 3, 0)
+
+# Elastic support with vertical stiffness only
+# Soil stiffness: 10 kN/m
+model.add_elastic_support(
+    node_id=3,
+    kx=None,   # No horizontal spring
+    ky=10,     # Vertical spring: 10 kN/m
+    krz=None   # No rotational spring
+)
+
+# Rigid restraints at ends
+model.add_restraint(1, True, True, False)
+model.add_restraint(2, True, True, False)
+
+# Apply load at mid-span
+model.add_load_pattern("Live Load")
+model.add_point_load(3, "Live Load", fx=0, fy=-50, mz=0)
+
+model.solve()
+model.show()
+```
+
+<Tip>
+The spring will deflect under the applied load. The reaction force equals `R = ky × δy`, where `δy` is the vertical displacement at the node.
+</Tip>
+
+### Multi-Directional Foundation Spring
+
+Model a column base with springs in both horizontal and vertical directions:
+
+```python
+model = SystemModel()
+
+# Define structure
+model.add_material("concrete", modulus_elasticity=2.5e6, poisson_ratio=0.2)
+model.add_rectangular_section("column", "concrete", base=0.4, height=0.4)
+
+# Create column
+model.add_node(1, 0, 0)  # Base
+model.add_node(2, 0, 4)  # Top
+model.add_member(1, 1, 2, "column", BeamTheoriesType.TIMOSHENKO)
+
+# Foundation spring at base
+# Vertical stiffness: 1000 kN/m
+# Horizontal stiffness: 500 kN/m
+# Rotational stiffness: 5000 kN·m/rad
+model.add_elastic_support(
+    node_id=1,
+    kx=500,    # Horizontal stiffness
+    ky=1000,   # Vertical stiffness
+    krz=5000   # Rotational stiffness
+)
+
+# Apply lateral load at top
+model.add_load_pattern("Wind")
+model.add_point_load(2, "Wind", fx=100, fy=0, mz=0)
+
+model.solve()
+```
+
+### Local Coordinate System Springs
+
+Apply springs in a local coordinate system (useful for inclined supports):
+
+```python
+import math
+
+# Create node on inclined surface
+model.add_node(5, 3, 2)
+
+# Define local axis at 30 degrees
+angle = 30 * math.pi / 180
+model.add_local_axis_for_node(5, angle)
+
+# Add spring in local coordinates
+# Spring is perpendicular to inclined surface
+model.add_elastic_support(
+    node_id=5,
+    kx=None,
+    ky=100,  # Normal to inclined surface (local Y)
+    krz=None,
+    CSys=CoordinateSystemType.LOCAL  # Use local coordinates
+)
+```
+
+<Note>
+When using local coordinate systems, the spring directions are oriented according to the local axes defined at the node. See [Local Node Axes](/advanced/local-axes) for more details.
+</Note>
+
+## Stiffness Calculation
+
+### Soil Spring Stiffness
+
+For foundation springs, stiffness can be estimated from soil properties:
+
+```python
+# Winkler foundation model
+# k = k_s × A
+# where:
+#   k_s = subgrade modulus (force/length³)
+#   A = tributary area (length²)
+
+subgrade_modulus = 5000  # kN/m³
+tributary_area = 2.0      # m²
+
+ky = subgrade_modulus * tributary_area  # = 10000 kN/m
+
+model.add_elastic_support(node_id=3, ky=ky)
+```
+
+### Structural Spring Stiffness
+
+For springs representing other structural elements:
+
+```python
+# Replace a column with equivalent spring
+# k = (3 × E × I) / L³  (for lateral stiffness of cantilever column)
+
+E = 2.5e6      # kN/m²
+I = 0.002133   # m⁴ (for 0.4m × 0.4m section)
+L = 3.0        # m
+
+kx = (3 * E * I) / (L ** 3)  # Lateral stiffness
+
+model.add_elastic_support(node_id=10, kx=kx)
+```
+
+## Combining Springs and Restraints
+
+You can combine elastic supports with rigid restraints:
+
+```python
+# Node with:
+# - Rigid restraint in X (no movement)
+# - Elastic support in Y (spring)
+# - Free rotation
+
+model.add_restraint(node_id=4, x=True, y=False, rz=False)
+model.add_elastic_support(node_id=4, ky=500)
+```
+
+<Warning>
+**Don't apply both a rigid restraint and elastic support in the same direction at the same node.** The rigid restraint will override the spring, making the spring ineffective.
+
+For example, this is incorrect:
+```python
+model.add_restraint(node_id=4, x=True, y=True, rz=False)  # y is fixed
+model.add_elastic_support(node_id=4, ky=500)  # y spring is ignored!
+```
+</Warning>
+
+## Verification Example
+
+Verify spring behavior by checking reaction forces:
+
+```python
+# Create simple model
+model = SystemModel()
+model.add_material("concrete", modulus_elasticity=2.1e6, poisson_ratio=0.2)
+model.add_rectangular_section("beam", "concrete", base=0.3, height=0.5)
+
+model.add_node(1, 0, 0)
+model.add_node(2, 3, 0)
+model.add_member(1, 1, 2, "beam", BeamTheoriesType.EULER_BERNOULLI)
+
+# Fixed support at node 1
+model.add_restraint(1, True, True, True)
+
+# Elastic support at node 2
+ky = 100  # kN/m
+model.add_elastic_support(2, ky=ky)
+
+# Apply load
+model.add_load_pattern("Test")
+model.add_point_load(2, "Test", fx=0, fy=-50, mz=0)
+
+# Solve
+model.solve("Test")
+
+# Get results
+results = model.get_results("Test")
+displacements = results.get_node_displacements(2)
+reactions = results.get_reactions()
+
+# Verify: Reaction should equal k × δ
+dy = displacements.dy
+expected_reaction = ky * abs(dy)
+
+print(f"Displacement: {dy:.4f} m")
+print(f"Spring reaction: {expected_reaction:.2f} kN")
+print(f"Total applied load: 50 kN")
+```
+
+## Advanced: Non-Linear Springs
+
+<Note>
+milcapy currently supports linear elastic springs only. For non-linear spring behavior (e.g., tension-only springs, gap elements), you would need to use an iterative approach or different analysis software.
+</Note>
+
+## Practical Applications
+
+### Bridge Bearing Modeling
+
+```python
+# Elastomeric bearing pad
+# Vertical stiffness: very high (nearly rigid)
+# Horizontal stiffness: low (allows thermal movement)
+
+model.add_elastic_support(
+    node_id=deck_support_node,
+    kx=50,      # Low horizontal stiffness
+    ky=50000,   # High vertical stiffness
+    krz=None    # Free rotation
+)
+```
+
+### Foundation Settlement Analysis
+
+```python
+# Different soil stiffnesses under different footings
+soft_soil_stiffness = 5000   # kN/m
+stiff_soil_stiffness = 15000  # kN/m
+
+model.add_elastic_support(footing_1, ky=soft_soil_stiffness)
+model.add_elastic_support(footing_2, ky=stiff_soil_stiffness)
+
+# Differential settlement will occur under load
+```
+
+### Seismic Isolation
+
+```python
+# Base isolation system
+isolator_stiffness = 200  # kN/m (low stiffness for isolation)
+
+for node in base_nodes:
+    model.add_elastic_support(
+        node_id=node,
+        kx=isolator_stiffness,
+        ky=isolator_stiffness * 10,  # Higher vertical stiffness
+        krz=None
+    )
+```
+
+## Debugging Tips
+
+1. **Check units**: Ensure stiffness values are in consistent units
+2. **Verify stiffness magnitude**: Very low stiffness → large displacements; very high stiffness → nearly rigid
+3. **Compare with rigid restraint**: Run analysis with both elastic support and rigid restraint to see the difference
+4. **Monitor reactions**: Spring reactions should equal `k × δ`
+
+<Tip>
+If you're unsure about appropriate stiffness values, start with a sensitivity analysis by running the model with different spring stiffnesses to understand the impact on results.
+</Tip>
+
+## Best Practices
+
+1. **Use realistic stiffness**: Base values on soil tests, manufacturer data, or code provisions
+2. **Document assumptions**: Keep notes on how stiffness values were determined
+3. **Check displacement magnitudes**: Ensure displacements are reasonable for the spring stiffness used
+4. **Validate with simple cases**: Test spring behavior with simple models before using in complex structures
+5. **Consider local axes**: Use local coordinates when springs need to be oriented differently from global axes
+
+## Related Topics
+
+<CardGroup cols={2}>
+  <Card title="Local Node Axes" icon="compass" href="/advanced/local-axes">
+    Define local coordinate systems for nodes
+  </Card>
+  <Card title="Restraints" icon="anchor" href="/api/restraints">
+    Apply rigid boundary conditions
+  </Card>
+</CardGroup>

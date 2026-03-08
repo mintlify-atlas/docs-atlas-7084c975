@@ -1,0 +1,164 @@
+---
+title: 'Solving Models'
+description: 'Learn how to solve structural models and run linear static analysis'
+---
+
+## Overview
+
+Once you've defined your model geometry, materials, sections, loads, and boundary conditions, you can solve the structural analysis using milcapy's linear static solver. The solver uses the **Direct Stiffness Method** and **Finite Element Method** to compute displacements, reactions, and internal forces.
+
+## Basic Solve Command
+
+The simplest way to solve your model is to call the `solve()` method:
+
+```python
+from milcapy import SystemModel
+
+model = SystemModel()
+# ... define materials, sections, nodes, elements, loads, etc.
+
+# Solve all active load patterns
+model.solve()
+```
+
+## Solving Specific Load Patterns
+
+You can solve for specific load patterns by passing their names as a list:
+
+```python
+# Solve only specific load patterns
+model.solve(load_pattern_name=["Dead Load", "Live Load"])
+```
+
+<Note>
+  If `load_pattern_name` is `None` (default), all **active** load patterns will be solved.
+</Note>
+
+## What Happens During Solve?
+
+When you call `solve()`, milcapy performs the following steps:
+
+1. **Assembly** - Constructs the global stiffness matrix (K) and load vector (F)
+2. **Boundary Conditions** - Applies restraints, elastic supports, and prescribed displacements
+3. **Solution** - Solves the system K·u = F using `numpy.linalg.solve()`
+4. **Post-Processing** - Computes reactions, internal forces, and member diagrams
+
+## Load Pattern States
+
+Only load patterns with `state=StateType.ACTIVE` will be analyzed:
+
+```python
+# Create active load pattern (default)
+model.add_load_pattern("Dead Load", state="ACTIVE")
+
+# Create inactive load pattern
+model.add_load_pattern("Wind Load", state="INACTIVE")
+
+# Change state later
+model.set_state_load_pattern("Wind Load", "ACTIVE")
+
+model.solve()  # Only solves active patterns
+```
+
+## Analysis Methods
+
+Milcapy uses the `LinearStaticAnalysis` class internally, which implements:
+
+- **Direct Stiffness Method** for frame and truss elements
+- **Finite Element Method** for membrane elements (CST, Q4, Q6, Q6I, Q8)
+- **Closed-form solutions** for 1D elements (beams and trusses)
+
+## Solution Output
+
+During the solve process, you'll see timing information printed to the console:
+
+```
+Tiempo de solucion: 0.0234 para el Load Pattern: Dead Load
+Tiempo de solucion: 0.0198 para el Load Pattern: Live Load
+```
+
+## Complete Example
+
+```python
+from milcapy import SystemModel, BeamTheoriesType
+
+model = SystemModel()
+
+# Define materials and sections
+model.add_material("concrete", modulus_elasticity=2.5e6, poisson_ratio=0.2)
+model.add_rectangular_section("beam", "concrete", base=0.3, height=0.5)
+
+# Define geometry
+model.add_node(1, 0, 0)
+model.add_node(2, 5, 0)
+model.add_node(3, 10, 0)
+
+model.add_member(1, 1, 2, "beam", BeamTheoriesType.TIMOSHENKO)
+model.add_member(2, 2, 3, "beam", BeamTheoriesType.TIMOSHENKO)
+
+# Boundary conditions
+model.add_restraint(1, ux=True, uy=True, rz=True)
+model.add_restraint(3, ux=False, uy=True, rz=False)
+
+# Load patterns
+model.add_load_pattern("Dead Load")
+model.add_point_load(2, "Dead Load", fx=0, fy=-100, mz=0)
+
+model.add_load_pattern("Live Load")
+model.add_distributed_load(1, "Live Load", load_start=-10, load_end=-10)
+
+# Solve the model
+model.solve()
+
+print("Analysis complete!")
+```
+
+## Advanced Options
+
+### Post-Processing Resolution
+
+Control the number of points used for member force diagrams:
+
+```python
+# Set number of evaluation points (default is 17)
+model.postprocessing_options.n = 100
+
+model.solve()
+```
+
+### Accessing Global Matrices
+
+After solving, you can access the assembled global matrices:
+
+```python
+model.solve()
+
+# Get global stiffness matrix
+K_global = model.global_stiffness_matrix
+
+# Get global load vector for specific pattern
+F_global = model.global_load_vector["Dead Load"]
+```
+
+## Troubleshooting
+
+<Warning>
+  **Singular Matrix Error**: If the model is unstable or has insufficient restraints, you may get a singular matrix error. Ensure your model has proper support conditions.
+</Warning>
+
+### Common Issues
+
+1. **No restraints defined** - Model needs at least one support
+2. **Unstable mechanism** - Check for missing restraints or releases
+3. **Inactive load patterns** - Verify patterns are set to `ACTIVE`
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Results Extraction" icon="chart-line" href="/analysis/results">
+    Learn how to extract and interpret analysis results
+  </Card>
+  <Card title="Visualization" icon="eye" href="/analysis/visualization">
+    Visualize your model and results interactively
+  </Card>
+</CardGroup>

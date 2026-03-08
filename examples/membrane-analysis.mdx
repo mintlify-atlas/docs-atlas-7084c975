@@ -1,0 +1,367 @@
+---
+title: "Membrane Element Analysis"
+description: "Model 2D plane stress problems using membrane elements in milcapy"
+---
+
+This example demonstrates how to model and analyze structures using 2D membrane elements (plane stress elements). You'll learn how to create a wall-beam portal frame system combining membrane elements with beam members.
+
+## Overview
+
+This example models a portal frame with:
+- Two concrete walls modeled with Q6 membrane elements
+- Three beam members connecting the walls horizontally
+- Fixed supports at the base of both walls
+- Lateral loads applied at wall joints
+
+## What are Membrane Elements?
+
+Membrane elements are 2D finite elements used for plane stress analysis:
+- Model thin structures loaded in their plane
+- Capture in-plane stress distribution
+- No out-of-plane bending behavior
+- Ideal for walls, plates, and thin shells under in-plane loading
+
+## Complete Example
+
+<Steps>
+
+<Step title="Import the library">
+Import the necessary modules:
+
+```python
+from milcapy import SystemModel
+```
+</Step>
+
+<Step title="Define geometric parameters">
+Set up the dimensional parameters for the structure:
+
+```python
+E = 2e6          # Young's modulus (tonf/m²)
+v = 0.3          # Poisson's ratio
+
+h = 2.4          # Wall height (m)
+b = 1.2          # Wall width (m)
+l = 2.4          # Beam length (m)
+
+t = 0.4          # Wall thickness (m)
+sec = [0.4, 0.4] # Beam section (m)
+F = 100          # Applied load (tonf)
+```
+
+These parameters define:
+- Material properties (E, v)
+- Geometric dimensions (h, b, l)
+- Section properties (t, sec)
+- Loading magnitude (F)
+</Step>
+
+<Step title="Create model and define materials">
+Initialize the model and create material and section definitions:
+
+```python
+wallPortal = SystemModel()
+
+wallPortal.add_material("concreto", E, v)
+wallPortal.add_rectangular_section("vig40x40", "concreto", *sec)
+wallPortal.add_shell_section("muro", "concreto", t)
+```
+
+- **Material**: Concrete with specified E and v
+- **vig40x40**: Rectangular beam section (0.4m × 0.4m)
+- **muro**: Shell/membrane section with 0.4m thickness
+</Step>
+
+<Step title="Create the nodal mesh">
+Define nodes for the two walls:
+
+```python
+# Left wall nodes
+wallPortal.add_node(1, 0, 0)      # Base
+wallPortal.add_node(2, b, 0)      # Base
+wallPortal.add_node(3, 0, h)      # Level 1
+wallPortal.add_node(4, b, h)      # Level 1
+wallPortal.add_node(5, 0, 2*h)    # Level 2
+wallPortal.add_node(6, b, 2*h)    # Level 2
+wallPortal.add_node(7, 0, 3*h)    # Level 3
+wallPortal.add_node(8, b, 3*h)    # Level 3
+
+# Right wall nodes
+wallPortal.add_node(9,  b+l, 0)      # Base
+wallPortal.add_node(10, b+l+b, 0)    # Base
+wallPortal.add_node(11, b+l, h)      # Level 1
+wallPortal.add_node(12, b+l+b, h)    # Level 1
+wallPortal.add_node(13, b+l, 2*h)    # Level 2
+wallPortal.add_node(14, b+l+b, 2*h)  # Level 2
+wallPortal.add_node(15, b+l, 3*h)    # Level 3
+wallPortal.add_node(16, b+l+b, 3*h)  # Level 3
+```
+
+This creates a 3-level portal frame structure with walls on each side.
+</Step>
+
+<Step title="Add membrane elements">
+Create Q6 quadrilateral membrane elements for the walls:
+
+```python
+# Left wall membrane elements
+wallPortal.add_membrane_q6(1, 1, 2, 4, 3, "muro")    # Level 0-1
+wallPortal.add_membrane_q6(2, 3, 4, 6, 5, "muro")    # Level 1-2
+wallPortal.add_membrane_q6(3, 5, 6, 8, 7, "muro")    # Level 2-3
+
+# Right wall membrane elements
+wallPortal.add_membrane_q6(4, 9, 10, 12, 11, "muro") # Level 0-1
+wallPortal.add_membrane_q6(5, 11, 12, 14, 13, "muro")# Level 1-2
+wallPortal.add_membrane_q6(6, 13, 14, 16, 15, "muro")# Level 2-3
+```
+
+<Note>
+The `add_membrane_q6()` method creates 6-node quadrilateral elements. Nodes are specified in counter-clockwise order: bottom-left, bottom-right, top-right, top-left.
+</Note>
+</Step>
+
+<Step title="Add beam connectors">
+Connect the two walls with horizontal beams:
+
+```python
+wallPortal.add_elastic_timoshenko_beam(7, 4, 11, "vig40x40")  # Level 1
+wallPortal.add_elastic_timoshenko_beam(8, 6, 13, "vig40x40")  # Level 2
+wallPortal.add_elastic_timoshenko_beam(9, 8, 15, "vig40x40")  # Level 3
+```
+
+These beams tie the two walls together at each level. Timoshenko beam theory accounts for shear deformation.
+
+<Note>
+Alternatively, you could use Euler-Bernoulli beams with:
+```python
+wallPortal.add_elastic_euler_bernoulli_beam(7, 4, 11, "vig40x40")
+```
+</Note>
+</Step>
+
+<Step title="Apply boundary conditions">
+Fix the base nodes of both walls:
+
+```python
+wallPortal.add_restraint(1,  *(True, True, True))  # Left wall base
+wallPortal.add_restraint(2,  *(True, True, True))  # Left wall base
+wallPortal.add_restraint(9,  *(True, True, True))  # Right wall base
+wallPortal.add_restraint(10, *(True, True, True))  # Right wall base
+```
+
+All base nodes are fully restrained (x, y, and rotation).
+</Step>
+
+<Step title="Apply lateral loads">
+Create a load pattern and apply increasing lateral loads up the left wall:
+
+```python
+wallPortal.add_load_pattern("carga")
+
+wallPortal.add_point_load(3, "carga", fx=1*F)  # Level 1: 100 tonf
+wallPortal.add_point_load(5, "carga", fx=2*F)  # Level 2: 200 tonf
+wallPortal.add_point_load(7, "carga", fx=3*F)  # Level 3: 300 tonf
+```
+
+The lateral loads simulate wind or seismic loading, increasing with height.
+</Step>
+
+<Step title="Solve and visualize">
+Perform the analysis and display results:
+
+```python
+wallPortal.solve()
+wallPortal.show()
+```
+
+The `show()` method opens an interactive 3D viewer displaying:
+- Deformed shape
+- Stress contours
+- Displacement magnitudes
+</Step>
+
+</Steps>
+
+## Full Code
+
+<CodeGroup>
+
+```python membrane_portal.py
+from milcapy import SystemModel
+
+# Define parameters
+E = 2e6          # Young's modulus (tonf/m²)
+v = 0.3          # Poisson's ratio
+h = 2.4          # Wall height (m)
+b = 1.2          # Wall width (m)
+l = 2.4          # Beam length (m)
+t = 0.4          # Wall thickness (m)
+sec = [0.4, 0.4] # Beam section (m)
+F = 100          # Applied load (tonf)
+
+# Create model
+wallPortal = SystemModel()
+
+# Define materials and sections
+wallPortal.add_material("concreto", E, v)
+wallPortal.add_rectangular_section("vig40x40", "concreto", *sec)
+wallPortal.add_shell_section("muro", "concreto", t)
+
+# Add nodes - Left wall
+wallPortal.add_node(1, 0, 0)
+wallPortal.add_node(2, b, 0)
+wallPortal.add_node(3, 0, h)
+wallPortal.add_node(4, b, h)
+wallPortal.add_node(5, 0, 2*h)
+wallPortal.add_node(6, b, 2*h)
+wallPortal.add_node(7, 0, 3*h)
+wallPortal.add_node(8, b, 3*h)
+
+# Add nodes - Right wall
+wallPortal.add_node(9,  b+l, 0)
+wallPortal.add_node(10, b+l+b, 0)
+wallPortal.add_node(11, b+l, h)
+wallPortal.add_node(12, b+l+b, h)
+wallPortal.add_node(13, b+l, 2*h)
+wallPortal.add_node(14, b+l+b, 2*h)
+wallPortal.add_node(15, b+l, 3*h)
+wallPortal.add_node(16, b+l+b, 3*h)
+
+# Add membrane elements
+wallPortal.add_membrane_q6(1, 1, 2, 4, 3, "muro")
+wallPortal.add_membrane_q6(2, 3, 4, 6, 5, "muro")
+wallPortal.add_membrane_q6(3, 5, 6, 8, 7, "muro")
+wallPortal.add_membrane_q6(4, 9, 10, 12, 11, "muro")
+wallPortal.add_membrane_q6(5, 11, 12, 14, 13, "muro")
+wallPortal.add_membrane_q6(6, 13, 14, 16, 15, "muro")
+
+# Add connecting beams
+wallPortal.add_elastic_timoshenko_beam(7, 4, 11, "vig40x40")
+wallPortal.add_elastic_timoshenko_beam(8, 6, 13, "vig40x40")
+wallPortal.add_elastic_timoshenko_beam(9, 8, 15, "vig40x40")
+
+# Apply boundary conditions
+wallPortal.add_restraint(1,  *(True, True, True))
+wallPortal.add_restraint(2,  *(True, True, True))
+wallPortal.add_restraint(9,  *(True, True, True))
+wallPortal.add_restraint(10, *(True, True, True))
+
+# Apply loads
+wallPortal.add_load_pattern("carga")
+wallPortal.add_point_load(3, "carga", fx=1*F)
+wallPortal.add_point_load(5, "carga", fx=2*F)
+wallPortal.add_point_load(7, "carga", fx=3*F)
+
+# Solve and visualize
+wallPortal.solve()
+wallPortal.show()
+```
+
+</CodeGroup>
+
+## Membrane Element Types in milcapy
+
+milcapy supports several membrane element formulations:
+
+<CardGroup cols={2}>
+
+<Card title="Q6 Elements" icon="square">
+**6-node quadrilateral**
+- Standard element with mid-side nodes
+- Good accuracy for most applications
+- Used in this example
+</Card>
+
+<Card title="Q8 Elements" icon="grid-2">
+**8-node quadrilateral**
+- Higher-order interpolation
+- Better for curved boundaries
+- Use `add_membrane_q8()`
+</Card>
+
+<Card title="Q6i Elements" icon="sparkles">
+**6-node with incompatible modes**
+- Enhanced accuracy for bending
+- Reduces shear locking
+- Use `add_membrane_q6i()`
+</Card>
+
+<Card title="CST Elements" icon="triangle">
+**Constant strain triangle**
+- 3-node triangular element
+- Simple but less accurate
+- Use for irregular meshes
+</Card>
+
+</CardGroup>
+
+## When to Use Membrane Elements
+
+### Appropriate for:
+- Shear walls under lateral loads
+- Deep beams with D/L > 1/4
+- Thin plates under in-plane loading
+- Plane stress/strain analysis
+- Bracket and gusset plate analysis
+
+### Not appropriate for:
+- Out-of-plane bending (use shell elements)
+- Thick sections under pure bending (use beam elements)
+- 3D stress states (use solid elements)
+
+<Note>
+For structures with both in-plane and out-of-plane behavior, consider using shell elements which combine membrane and plate bending behavior.
+</Note>
+
+## Patch Test Validation
+
+The membrane element formulations in milcapy pass standard patch tests, ensuring:
+- Constant strain states are exactly reproduced
+- Element convergence with mesh refinement
+- Proper rank of stiffness matrix
+
+See the `patch_test.py` example in the source code for validation cases.
+
+## Advanced Topics
+
+<CardGroup cols={2}>
+
+<Card title="Mesh Refinement" icon="table-cells">
+Increase element density in high-stress regions for better accuracy
+</Card>
+
+<Card title="Mixed Formulations" icon="layer-group">
+Combine different element types in transition regions
+</Card>
+
+<Card title="Incompatible Modes" icon="wand-sparkles">
+Use enhanced elements (Q6i, MQ6IMod) for improved bending behavior
+</Card>
+
+<Card title="Material Nonlinearity" icon="chart-line">
+Model concrete cracking and steel yielding
+</Card>
+
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+
+<Card title="Portal Frame" icon="building-columns" href="/examples/simple-portal">
+Learn frame modeling with beam elements
+</Card>
+
+<Card title="Truss Analysis" icon="diagram-project" href="/examples/truss-analysis">
+Model axial-only structures
+</Card>
+
+<Card title="Shell Sections" icon="book" href="/api/sections">
+View shell and membrane section API
+</Card>
+
+<Card title="Material Library" icon="flask" href="/api/materials">
+Explore material definitions and properties
+</Card>
+
+</CardGroup>

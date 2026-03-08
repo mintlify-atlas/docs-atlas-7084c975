@@ -1,80 +1,317 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Build your first structural model with milcapy in minutes
 ---
 
-## Get started in three steps
+This guide will walk you through creating your first structural analysis model with milcapy. You'll build a simple beam, apply loads, and visualize the results.
 
-Get your documentation site running locally and make your first customization.
+## Prerequisites
 
-### Step 1: Set up your local environment
+Before starting, make sure you have [installed milcapy](/installation).
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
+## Your First Model
+
+Let's create a simple cantilever beam model step by step.
+
+<Steps>
+  <Step title="Import milcapy">
+    First, import the required classes and functions from milcapy:
+
+    ```python
+    from milcapy import SystemModel, BeamTheoriesType
+    ```
+
+    - `SystemModel` - The main class for creating structural models
+    - `BeamTheoriesType` - Enum for selecting beam theory (Timoshenko or Euler-Bernoulli)
+  </Step>
+
+  <Step title="Create a model">
+    Initialize a new structural model:
+
+    ```python
+    model = SystemModel()
+    ```
+
+    This creates an empty model ready for you to add materials, sections, nodes, and elements.
+  </Step>
+
+  <Step title="Define material">
+    Add a concrete material with elastic properties:
+
+    ```python
+    model.add_material(
+        name="concrete",
+        modulus_elasticity=2.1e6,  # kN/m²
+        poisson_ratio=0.2
+    )
+    ```
+
+    <Note>
+      Ensure consistent units throughout your model. Here we're using kN and meters.
+    </Note>
+  </Step>
+
+  <Step title="Define section">
+    Create a rectangular beam section:
+
+    ```python
+    model.add_rectangular_section(
+        name="beam",
+        material_name="concrete",
+        base=0.3,      # m
+        height=0.5     # m
+    )
+    ```
+
+    This defines a 0.3m × 0.5m rectangular cross-section.
+  </Step>
+
+  <Step title="Add nodes">
+    Define the geometry by adding nodes:
+
+    ```python
+    model.add_node(1, 0, 0)    # Node 1 at origin
+    model.add_node(2, 5, 0)    # Node 2 at 5m horizontal
+    ```
+
+    <Warning>
+      Node IDs must be sequential integers starting from 1: (1, 2, 3, ...).
+    </Warning>
+  </Step>
+
+  <Step title="Add member">
+    Connect the nodes with a beam element:
+
+    ```python
+    model.add_member(
+        id=1,
+        node_i_id=1,
+        node_j_id=2,
+        section_name="beam",
+        beam_theory=BeamTheoriesType.TIMOSHENKO
+    )
+    ```
+
+    This creates a Timoshenko beam between nodes 1 and 2.
+  </Step>
+
+  <Step title="Apply boundary conditions">
+    Fix node 1 (cantilever support) and restrain vertical movement at node 2:
+
+    ```python
+    model.add_restraint(1, ux=True, uy=True, rz=True)  # Fixed support
+    model.add_restraint(2, ux=False, uy=True, rz=False)  # Vertical restraint
+    ```
+
+    - `ux` - Horizontal displacement
+    - `uy` - Vertical displacement
+    - `rz` - Rotation about Z-axis
+  </Step>
+
+  <Step title="Create load pattern">
+    Define a load case:
+
+    ```python
+    model.add_load_pattern("Live Load")
+    ```
+
+    Load patterns let you organize different loading scenarios (dead load, live load, wind, etc.).
+  </Step>
+
+  <Step title="Apply loads">
+    Add a point load at node 2:
+
+    ```python
+    model.add_point_load(
+        node_id=2,
+        load_pattern_name="Live Load",
+        fx=0,      # kN
+        fy=-100,   # kN (downward)
+        mz=0       # kN·m
+    )
+    ```
+
+    This applies a 100 kN downward force at the free end.
+  </Step>
+
+  <Step title="Solve the model">
+    Run the structural analysis:
+
+    ```python
+    model.solve()
+    ```
+
+    This assembles the global stiffness matrix, applies boundary conditions, and solves for displacements and internal forces.
+  </Step>
+
+  <Step title="View results">
+    Extract and display results:
+
+    ```python
+    # Get results for the load pattern
+    results = model.get_results("Live Load")
     
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
+    # Get node displacements
+    node_2_disp = results.get_node_displacements(2)
+    print(f"Node 2 displacement: {node_2_disp}")
     
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
+    # Get member forces
+    member_forces = results.get_member_internal_forces(1)
+    print(f"Member 1 forces: {member_forces}")
     
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    # Visualize the model
+    model.show()
+    ```
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+    The `show()` method opens an interactive viewer where you can see:
+    - Model geometry
+    - Deformed shape
+    - Force diagrams (axial, shear, moment)
+    - Reactions
+  </Step>
+</Steps>
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+## Complete Example
 
-### Step 3: Go live
+Here's the complete code for the cantilever beam:
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+<CodeGroup>
 
-## Next steps
+```python Complete Example
+from milcapy import SystemModel, BeamTheoriesType
 
-Now that you have your docs running, explore these key features:
+# Create model
+model = SystemModel()
+
+# Define material
+model.add_material("concrete", modulus_elasticity=2.1e6, poisson_ratio=0.2)
+
+# Define section
+model.add_rectangular_section("beam", "concrete", base=0.3, height=0.5)
+
+# Add nodes
+model.add_node(1, 0, 0)
+model.add_node(2, 5, 0)
+
+# Add member
+model.add_member(1, 1, 2, "beam", BeamTheoriesType.TIMOSHENKO)
+
+# Boundary conditions
+model.add_restraint(1, ux=True, uy=True, rz=True)
+model.add_restraint(2, ux=False, uy=True, rz=False)
+
+# Load pattern
+model.add_load_pattern("Live Load")
+model.add_point_load(2, "Live Load", fx=0, fy=-100, mz=0)
+
+# Solve
+model.solve()
+
+# Results
+results = model.get_results("Live Load")
+displacements = results.get_node_displacements(2)
+print(f"Node 2 displacement: {displacements}")
+
+# Visualize
+model.show()
+```
+
+```python Simple Truss
+from milcapy import SystemModel
+
+# Create truss model
+model = SystemModel()
+
+# Material and section
+model.add_material("steel", modulus_elasticity=2.0e8, poisson_ratio=0.3)
+model.add_circular_section("bar", "steel", diameter=0.05)
+
+# Nodes
+model.add_node(1, 0, 0)
+model.add_node(2, 4, 0)
+model.add_node(3, 2, 3)
+
+# Truss members
+model.add_truss(1, 1, 3, "bar")
+model.add_truss(2, 2, 3, "bar")
+model.add_truss(3, 1, 2, "bar")
+
+# Supports
+model.add_restraint(1, ux=True, uy=True, rz=True)
+model.add_restraint(2, ux=False, uy=True, rz=False)
+
+# Load
+model.add_load_pattern("Load")
+model.add_point_load(3, "Load", fx=0, fy=-50, mz=0)
+
+# Solve and view
+model.solve()
+model.show()
+```
+
+</CodeGroup>
+
+## Understanding Results
+
+After solving, you can extract various results:
+
+```python
+results = model.get_results("Live Load")
+
+# Node results
+displacements = results.get_node_displacements(2)  # [ux, uy, rz]
+reactions = results.get_node_reactions(1)          # [Rx, Ry, Mz]
+
+# Member results
+axial = results.get_member_axial_force(1)          # Axial force diagram
+shear = results.get_member_shear_force(1)          # Shear force diagram
+moment = results.get_member_bending_moment(1)      # Bending moment diagram
+deflection = results.get_member_deflection(1)      # Deflection curve
+```
+
+The results are returned as NumPy arrays for easy plotting and post-processing.
+
+## Next Steps
+
+Now that you've created your first model, explore more advanced features:
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Truss Analysis" icon="diagram-project" href="/elements/trusses">
+    Learn about truss elements and axial members
+  </Card>
+  <Card title="Membrane Elements" icon="grid" href="/elements/membrane-cst">
+    Explore 2D finite element analysis
+  </Card>
+  <Card title="Load Types" icon="weight-hanging" href="/api/loads">
+    Apply distributed loads and self-weight
+  </Card>
+  <Card title="Advanced Features" icon="sliders" href="/advanced/end-offsets">
+    Use end offsets, releases, and elastic supports
+  </Card>
 </CardGroup>
 
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>
+## Tips for Success
+
+<Tip>
+  **Start Simple**: Begin with simple models to understand the workflow, then add complexity gradually.
+</Tip>
+
+<Tip>
+  **Check Units**: Maintain consistent units throughout (kN-m, N-mm, etc.) to avoid errors.
+</Tip>
+
+<Tip>
+  **Visualize Early**: Use `model.show()` frequently to verify your geometry and loads before solving.
+</Tip>
+
+<Tip>
+  **Sequential IDs**: Always use sequential node IDs (1, 2, 3, ...). The solver requires this for matrix assembly.
+</Tip>
+
+## Getting Help
+
+If you encounter issues:
+
+- Check the [API Reference](/api/system-model) for detailed method documentation
+- Review [examples](/examples/simple-portal) for common modeling patterns
+- Visit the [GitHub repository](https://github.com/amachacca/milcapy) to report bugs or ask questions

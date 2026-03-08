@@ -1,0 +1,104 @@
+---
+title: Load Patterns
+description: Methods for creating and managing load patterns in milcapy
+---
+
+Load patterns are collections of loads that are applied to model members. A model can have multiple load patterns and analyze them separately.
+
+## add_load_pattern()
+
+Creates a new load pattern in the model.
+
+```python
+model.add_load_pattern(
+    name='Dead Load',
+    self_weight_multiplier=1.0,
+    state=StateType.ACTIVE
+)
+```
+
+### Parameters
+
+<ParamField path="name" type="str" required>
+  Name of the load pattern
+</ParamField>
+
+<ParamField path="self_weight_multiplier" type="float" default="0.0">
+  Multiplier for self-weight loads. Default is 0.0 (no self-weight)
+</ParamField>
+
+<ParamField path="state" type="str | StateType" default="StateType.ACTIVE">
+  State of the load pattern. Can be:
+  - `'ACTIVE'` or `StateType.ACTIVE` - Pattern is active and will be analyzed
+  - `'INACTIVE'` or `StateType.INACTIVE` - Pattern is inactive and will be ignored
+</ParamField>
+
+### Returns
+
+<ResponseField name="LoadPattern" type="LoadPattern">
+  The created load pattern object
+</ResponseField>
+
+### Raises
+
+- `ValueError` - If a load pattern with the same name already exists
+
+---
+
+## set_state_load_pattern()
+
+Changes the state of an existing load pattern.
+
+```python
+model.set_state_load_pattern(
+    load_pattern_name='Dead Load',
+    state=StateType.INACTIVE
+)
+```
+
+### Parameters
+
+<ParamField path="load_pattern_name" type="str" required>
+  Name of the load pattern to modify
+</ParamField>
+
+<ParamField path="state" type="str | StateType" required>
+  New state for the load pattern. Can be:
+  - `'ACTIVE'` or `StateType.ACTIVE` - Pattern is active and will be analyzed
+  - `'INACTIVE'` or `StateType.INACTIVE` - Pattern is inactive and will be ignored
+</ParamField>
+
+### Raises
+
+- `ValueError` - If the load pattern does not exist
+
+---
+
+## Example Usage
+
+```python
+import milcapy as milca
+from milcapy.utils.types import StateType
+
+# Create model
+model = milca.SystemMilcaModel()
+
+# Create active load pattern with self-weight
+model.add_load_pattern(
+    name='Dead Load',
+    self_weight_multiplier=1.0,
+    state=StateType.ACTIVE
+)
+
+# Create inactive live load pattern
+model.add_load_pattern(
+    name='Live Load',
+    state='INACTIVE'
+)
+
+# Activate the live load pattern later
+model.set_state_load_pattern(
+    load_pattern_name='Live Load',
+    state=StateType.ACTIVE
+)
+```

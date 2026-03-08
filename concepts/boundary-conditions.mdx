@@ -1,0 +1,382 @@
+---
+title: 'Boundary Conditions'
+description: 'Define supports, restraints, and prescribed displacements'
+icon: 'anchor'
+---
+
+## Overview
+
+Boundary conditions define how the structure is supported and constrained. milcapy provides several types of boundary conditions including fixed restraints, prescribed displacements, elastic supports, and local coordinate systems.
+
+## Restraints (Fixed Supports)
+
+Restraints prevent movement at specific degrees of freedom. Each node has 3 DOFs that can be restrained:
+
+- **ux**: Translation in X direction
+- **uy**: Translation in Y direction
+- **rz**: Rotation about Z axis
+
+### Adding Restraints
+
+```python
+model.add_restraint(
+    node_id=1,
+    ux=True,   # Restrain X translation
+    uy=True,   # Restrain Y translation
+    rz=True    # Restrain Z rotation
+)
+```
+
+### Common Support Types
+
+<Accordion title="Fixed Support">
+  Prevents all translations and rotations:
+  
+  ```python
+  model.add_restraint(
+      node_id=1,
+      ux=True,
+      uy=True,
+      rz=True
+  )
+  ```
+  
+  **Use cases**: Column bases, rigid connections to foundations
+</Accordion>
+
+<Accordion title="Pinned Support">
+  Prevents translations but allows rotation:
+  
+  ```python
+  model.add_restraint(
+      node_id=2,
+      ux=True,
+      uy=True,
+      rz=False  # Free to rotate
+  )
+  ```
+  
+  **Use cases**: Simple beam supports, truss joints
+</Accordion>
+
+<Accordion title="Roller Support">
+  Prevents vertical translation only:
+  
+  ```python
+  model.add_restraint(
+      node_id=3,
+      ux=False,  # Free to move horizontally
+      uy=True,   # Restrained vertically
+      rz=False   # Free to rotate
+  )
+  ```
+  
+  **Use cases**: Expansion joints, sliding supports
+</Accordion>
+
+<Accordion title="Vertical Restraint">
+  Prevents horizontal translation only:
+  
+  ```python
+  model.add_restraint(
+      node_id=4,
+      ux=True,   # Restrained horizontally
+      uy=False,  # Free to move vertically
+      rz=False
+  )
+  ```
+  
+  **Use cases**: Vertical sliding supports
+</Accordion>
+
+## Prescribed Displacements
+
+Prescribed displacements impose specific displacement values at nodes, useful for settlement analysis or imposed deformations:
+
+```python
+model.add_prescribed_dof(
+    node_id=1,
+    load_pattern_name="SETTLEMENT",
+    ux=None,      # No prescribed displacement in X
+    uy=-0.010,    # 10mm downward settlement
+    rz=None,      # No prescribed rotation
+    CSys="GLOBAL" # Coordinate system
+)
+```
+
+<Note>
+  Use `None` for DOFs without prescribed displacement. Only specify values for DOFs you want to control.
+</Note>
+
+### Settlement Analysis Example
+
+```python
+# Create settlement load pattern
+model.add_load_pattern(
+    name="SETTLEMENT",
+    self_weight_multiplier=0.0
+)
+
+# Apply support settlement
+model.add_prescribed_dof(
+    node_id=1,
+    load_pattern_name="SETTLEMENT",
+    uy=-0.020  # 20mm settlement
+)
+
+model.add_prescribed_dof(
+    node_id=4,
+    load_pattern_name="SETTLEMENT",
+    uy=-0.015  # 15mm settlement (differential settlement)
+)
+```
+
+<Warning>
+  Prescribed displacements are associated with load patterns. Make sure to create the load pattern before adding prescribed DOFs.
+</Warning>
+
+## Elastic Supports
+
+Elastic supports provide flexible support using spring stiffness values:
+
+```python
+model.add_elastic_support(
+    node_id=1,
+    kx=1000000,    # Stiffness in X direction (N/m)
+    ky=5000000,    # Stiffness in Y direction (N/m)
+    krz=100000,    # Rotational stiffness (N·m/rad)
+    CSys="GLOBAL"
+)
+```
+
+### Elastic Support Applications
+
+<Accordion title="Foundation Springs">
+  Model soil-structure interaction:
+  
+  ```python
+  # Soil spring constants (from geotechnical analysis)
+  k_soil_vertical = 10e6    # N/m
+  k_soil_horizontal = 5e6   # N/m
+  k_soil_rotational = 2e6   # N·m/rad
+  
+  model.add_elastic_support(
+      node_id=1,
+      kx=k_soil_horizontal,
+      ky=k_soil_vertical,
+      krz=k_soil_rotational
+  )
+  ```
+</Accordion>
+
+<Accordion title="Partial Restraints">
+  Simulate semi-rigid connections:
+  
+  ```python
+  # Semi-rigid rotational spring
+  model.add_elastic_support(
+      node_id=5,
+      kx=None,  # No spring in X
+      ky=None,  # No spring in Y
+      krz=5e5   # Rotational spring only
+  )
+  ```
+</Accordion>
+
+<Note>
+  Use `None` for infinite stiffness (rigid restraint in that direction). Use `0` for free movement, or a positive value for elastic support.
+</Note>
+
+## Local Coordinate Systems
+
+Define inclined or rotated coordinate systems at nodes:
+
+```python
+import math
+
+# Define local axis at 45 degrees
+model.add_local_axis_for_node(
+    node_id=1,
+    angle=math.radians(45)  # Angle in radians
+)
+```
+
+### Using Local Axes
+
+Local axes affect:
+1. **Restraints** - Applied in local directions
+2. **Loads** - When using `CSys="LOCAL"`
+3. **Results** - Displacements/forces in local coordinates
+
+```python
+import math
+
+# Create inclined support (30° from horizontal)
+angle = math.radians(30)
+model.add_local_axis_for_node(node_id=1, angle=angle)
+
+# Restrain in local Y direction (perpendicular to incline)
+model.add_restraint(
+    node_id=1,
+    ux=False,
+    uy=True,  # Restrained perpendicular to inclined surface
+    rz=False
+)
+
+# Add load in local coordinates
+model.add_point_load(
+    node_id=1,
+    load_pattern_name="LL",
+    fx=0,
+    fy=-1000,  # Load perpendicular to inclined surface
+    CSys="LOCAL"
+)
+```
+
+<Accordion title="Common Inclined Support Angles">
+  ```python
+  import math
+  
+  # 30° incline
+  angle_30 = math.radians(30)
+  
+  # 45° incline  
+  angle_45 = math.radians(45)
+  
+  # 60° incline
+  angle_60 = math.radians(60)
+  
+  model.add_local_axis_for_node(node_id=1, angle=angle_30)
+  ```
+</Accordion>
+
+## Combining Boundary Conditions
+
+You can apply multiple boundary condition types to the same node:
+
+```python
+# Node with elastic support and prescribed settlement
+model.add_elastic_support(
+    node_id=1,
+    kx=1e6,
+    ky=5e6,
+    krz=None
+)
+
+model.add_prescribed_dof(
+    node_id=1,
+    load_pattern_name="SETTLEMENT",
+    uy=-0.01  # 10mm settlement on elastic support
+)
+```
+
+## Complete Example: Frame with Various Supports
+
+```python
+import math
+from milcapy import SystemMilcaModel
+
+# Create model and add geometry
+model = SystemMilcaModel()
+
+# Add material and sections
+model.add_material(name="Steel", modulus_elasticity=200e9,
+                   poisson_ratio=0.3, specific_weight=78500)
+model.add_rectangular_section(name="COL", material_name="Steel",
+                              base=0.30, height=0.30)
+
+# Create nodes
+model.add_node(id=1, x=0.0, y=0.0)   # Left column base
+model.add_node(id=2, x=0.0, y=4.0)   # Left column top
+model.add_node(id=3, x=8.0, y=4.0)   # Right column top
+model.add_node(id=4, x=8.0, y=0.0)   # Right column base
+
+# Create columns and beam
+model.add_member(id=1, node_i_id=1, node_j_id=2, section_name="COL")
+model.add_member(id=2, node_i_id=2, node_j_id=3, section_name="COL")
+model.add_member(id=3, node_i_id=4, node_j_id=3, section_name="COL")
+
+# Left support: Fixed
+model.add_restraint(
+    node_id=1,
+    ux=True,
+    uy=True,
+    rz=True
+)
+
+# Right support: Roller (horizontal movement allowed)
+model.add_restraint(
+    node_id=4,
+    ux=False,  # Free horizontal movement
+    uy=True,
+    rz=True
+)
+
+# Add elastic support under roller (foundation spring)
+model.add_elastic_support(
+    node_id=4,
+    ky=10e6  # 10 MN/m vertical spring
+)
+
+# Settlement load case
+model.add_load_pattern(name="SETTLEMENT", self_weight_multiplier=0.0)
+model.add_prescribed_dof(
+    node_id=4,
+    load_pattern_name="SETTLEMENT",
+    uy=-0.025  # 25mm settlement
+)
+```
+
+## Boundary Condition Checks
+
+<Warning>
+  **Stability Check**: Ensure your structure has sufficient restraints to prevent rigid body motion. A 2D structure typically needs at least 3 restraints to be stable.
+</Warning>
+
+<Tip>
+  **Common Minimum Restraints**:
+  - 1 fixed support (3 restraints)
+  - 1 pinned + 1 roller (2 + 1 = 3 restraints)
+  - 2 pinned supports + 1 horizontal restraint elsewhere
+</Tip>
+
+<Warning>
+  **Over-Constraint**: Too many restraints can lead to incompatible constraints. Use elastic supports or releases when needed.
+</Warning>
+
+## Best Practices
+
+<Tip>
+  **Coordinate System Consistency**: When using local axes, clearly document the angle convention. milcapy uses counter-clockwise positive angles from the global X-axis.
+</Tip>
+
+<Tip>
+  **Elastic Support Stiffness**: 
+  - Use realistic spring values from geotechnical reports
+  - Very high stiffness (greater than 1e12) approaches rigid restraint
+  - Very low stiffness (less than 1) approaches free movement
+</Tip>
+
+<Note>
+  **Units Matter**: Ensure consistent units:
+  - Translational springs: N/m or kN/m
+  - Rotational springs: N·m/rad or kN·m/rad
+  - Displacements: meters
+  - Angles: radians
+</Note>
+
+## Related Concepts
+
+<CardGroup cols={2}>
+  <Card title="Nodes & Elements" icon="diagram-project" href="/concepts/nodes-elements">
+    Understanding node geometry and connectivity
+  </Card>
+  
+  <Card title="Load Patterns" icon="weight-hanging" href="/concepts/load-patterns">
+    Applying loads after defining supports
+  </Card>
+  
+  <Card title="Running Analysis" icon="play" href="/analysis/solving">
+    Solving models with boundary conditions
+  </Card>
+</CardGroup>

@@ -1,0 +1,256 @@
+---
+title: Loads
+description: Methods for applying loads to nodes and members in milcapy
+---
+
+These methods allow you to apply various types of loads to your structural model including point loads, distributed loads, prescribed displacements, and self-weight.
+
+## add_point_load()
+
+Applies a point load to a node within a load pattern.
+
+```python
+model.add_point_load(
+    node_id=1,
+    load_pattern_name='Dead Load',
+    fx=10.0,
+    fy=-20.0,
+    mz=5.0,
+    CSys=CoordinateSystemType.GLOBAL,
+    replace=False
+)
+```
+
+### Parameters
+
+<ParamField path="node_id" type="int" required>
+  ID of the node where the load is applied
+</ParamField>
+
+<ParamField path="load_pattern_name" type="str" required>
+  Name of the load pattern
+</ParamField>
+
+<ParamField path="fx" type="float" default="0.0">
+  Force in X direction
+</ParamField>
+
+<ParamField path="fy" type="float" default="0.0">
+  Force in Y direction
+</ParamField>
+
+<ParamField path="mz" type="float" default="0.0">
+  Moment about Z axis
+</ParamField>
+
+<ParamField path="CSys" type="str | CoordinateSystemType" default="'GLOBAL'">
+  Coordinate system for the load. Options:
+  - `'GLOBAL'` or `CoordinateSystemType.GLOBAL` - Global coordinate system
+  - `'LOCAL'` or `CoordinateSystemType.LOCAL` - Local coordinate system (node-specific)
+</ParamField>
+
+<ParamField path="replace" type="bool" default="False">
+  If `True`, replaces any existing load at this node. If `False`, adds to existing loads
+</ParamField>
+
+### Raises
+
+- `ValueError` - If the node or load pattern does not exist
+
+---
+
+## add_distributed_load()
+
+Applies a distributed load to a member within a load pattern.
+
+```python
+model.add_distributed_load(
+    member_id=1,
+    load_pattern_name='Dead Load',
+    load_start=-5.0,
+    load_end=-5.0,
+    CSys=CoordinateSystemType.LOCAL,
+    direction=DirectionType.LOCAL_2,
+    load_type=LoadType.FORCE,
+    replace=False
+)
+```
+
+### Parameters
+
+<ParamField path="member_id" type="int" required>
+  ID of the member where the load is applied
+</ParamField>
+
+<ParamField path="load_pattern_name" type="str" required>
+  Name of the load pattern
+</ParamField>
+
+<ParamField path="load_start" type="float" default="0.0">
+  Load magnitude at the start of the member
+</ParamField>
+
+<ParamField path="load_end" type="float" default="0.0">
+  Load magnitude at the end of the member
+</ParamField>
+
+<ParamField path="CSys" type="str | CoordinateSystemType" default="'LOCAL'">
+  Coordinate system for the load. Options:
+  - `'GLOBAL'` or `CoordinateSystemType.GLOBAL`
+  - `'LOCAL'` or `CoordinateSystemType.LOCAL`
+</ParamField>
+
+<ParamField path="direction" type="str | DirectionType" default="'LOCAL_2'">
+  Direction of the load. Options:
+  
+  **Local directions:**
+  - `'LOCAL_1'` or `DirectionType.LOCAL_1` - Axial direction
+  - `'LOCAL_2'` or `DirectionType.LOCAL_2` - Shear direction (perpendicular)
+  - `'LOCAL_3'` or `DirectionType.LOCAL_3` - Moment
+  
+  **Global directions:**
+  - `'X'` or `DirectionType.X`
+  - `'Y'` or `DirectionType.Y`
+  - `'X_PROJ'` or `DirectionType.X_PROJ` - Projected in X
+  - `'Y_PROJ'` or `DirectionType.Y_PROJ` - Projected in Y
+  - `'GRAVITY'` or `DirectionType.GRAVITY`
+  - `'GRAVITY_PROJ'` or `DirectionType.GRAVITY_PROJ` - Projected gravity
+</ParamField>
+
+<ParamField path="load_type" type="str | LoadType" default="'FORCE'">
+  Type of load. Currently only `'FORCE'` or `LoadType.FORCE` is supported
+</ParamField>
+
+<ParamField path="replace" type="bool" default="False">
+  If `True`, replaces any existing distributed load on this member
+</ParamField>
+
+### Raises
+
+- `ValueError` - If the member or load pattern does not exist
+- `ValueError` - For truss elements, only axial loads (LOCAL_1) are allowed
+
+---
+
+## add_prescribed_dof()
+
+Applies prescribed displacements (support settlements) to a node within a load pattern.
+
+```python
+model.add_prescribed_dof(
+    node_id=1,
+    load_pattern_name='Settlement',
+    ux=0.001,
+    uy=-0.002,
+    rz=0.0,
+    CSys=CoordinateSystemType.GLOBAL
+)
+```
+
+### Parameters
+
+<ParamField path="node_id" type="int" required>
+  ID of the node where the displacement is prescribed
+</ParamField>
+
+<ParamField path="load_pattern_name" type="str" required>
+  Name of the load pattern
+</ParamField>
+
+<ParamField path="ux" type="float | None" default="None">
+  Prescribed displacement in X direction. `None` means no prescribed displacement
+</ParamField>
+
+<ParamField path="uy" type="float | None" default="None">
+  Prescribed displacement in Y direction. `None` means no prescribed displacement
+</ParamField>
+
+<ParamField path="rz" type="float | None" default="None">
+  Prescribed rotation about Z axis. `None` means no prescribed rotation
+</ParamField>
+
+<ParamField path="CSys" type="str | CoordinateSystemType" default="'GLOBAL'">
+  Coordinate system for the displacements. Options:
+  - `'GLOBAL'` or `CoordinateSystemType.GLOBAL`
+  - `'LOCAL'` or `CoordinateSystemType.LOCAL`
+</ParamField>
+
+### Raises
+
+- `ValueError` - If the node or load pattern does not exist
+
+---
+
+## add_self_weight()
+
+Applies self-weight loads to all members in the model within a load pattern.
+
+```python
+model.add_self_weight(
+    load_pattern_name='Dead Load',
+    factor=1.0
+)
+```
+
+### Parameters
+
+<ParamField path="load_pattern_name" type="str" required>
+  Name of the load pattern
+</ParamField>
+
+<ParamField path="factor" type="float" default="1.0">
+  Scaling factor for self-weight. Use negative values to reverse direction
+</ParamField>
+
+### Raises
+
+- `ValueError` - If the load pattern does not exist
+
+---
+
+## Example Usage
+
+```python
+import milcapy as milca
+from milcapy.utils.types import CoordinateSystemType, DirectionType, LoadType
+
+# Create model and add elements...
+model = milca.SystemMilcaModel()
+
+# Create load pattern
+model.add_load_pattern('Dead Load')
+
+# Add point load at node 1
+model.add_point_load(
+    node_id=1,
+    load_pattern_name='Dead Load',
+    fx=0.0,
+    fy=-100.0,  # 100 kN downward
+    mz=0.0
+)
+
+# Add uniform distributed load on member 1
+model.add_distributed_load(
+    member_id=1,
+    load_pattern_name='Dead Load',
+    load_start=-10.0,  # 10 kN/m downward
+    load_end=-10.0,
+    direction=DirectionType.LOCAL_2
+)
+
+# Add self-weight
+model.add_self_weight(
+    load_pattern_name='Dead Load',
+    factor=1.0
+)
+
+# Create settlement load pattern
+model.add_load_pattern('Settlement')
+
+# Add prescribed displacement (support settlement)
+model.add_prescribed_dof(
+    node_id=2,
+    load_pattern_name='Settlement',
+    uy=-0.01  # 10mm settlement
+)
+```

@@ -1,0 +1,126 @@
+---
+title: solve()
+description: Solve the structural analysis problem in milcapy
+---
+
+The `solve()` method performs the structural analysis by assembling the global stiffness matrix, applying loads, and solving for displacements and reactions.
+
+## Method Signature
+
+```python
+results = model.solve(load_pattern_name=None)
+```
+
+## Parameters
+
+<ParamField path="load_pattern_name" type="list[str] | None" default="None">
+  List of load pattern names to analyze. If `None`, all active load patterns in the model will be analyzed.
+  
+  **Examples:**
+  - `None` - Analyzes all active load patterns
+  - `['Dead Load']` - Analyzes only the 'Dead Load' pattern
+  - `['Dead Load', 'Live Load']` - Analyzes both specified patterns
+</ParamField>
+
+## Returns
+
+<ResponseField name="results" type="Dict[str, Results]">
+  Dictionary mapping load pattern names to their corresponding `Results` objects. Each `Results` object contains displacements, reactions, and internal forces for that load pattern.
+</ResponseField>
+
+## Raises
+
+- `ValueError` - If no load patterns are defined in the model
+
+## Analysis Process
+
+When you call `solve()`, milcapy performs the following steps:
+
+1. **Assembly** - Constructs the global stiffness matrix from all elements
+2. **Load Application** - Applies all loads from the specified load patterns
+3. **Boundary Conditions** - Applies restraints and supports
+4. **Solution** - Solves the system of equations: `K·u = F`
+5. **Post-processing** - Calculates reactions, internal forces, and detailed member results
+
+## Example Usage
+
+### Solve All Load Patterns
+
+```python
+import milcapy as milca
+
+model = milca.SystemMilcaModel()
+
+# ... define geometry, materials, sections, elements ...
+
+# Create load patterns
+model.add_load_pattern('Dead Load')
+model.add_load_pattern('Live Load')
+
+# Add loads
+model.add_point_load(node_id=2, load_pattern_name='Dead Load', fy=-100)
+model.add_point_load(node_id=2, load_pattern_name='Live Load', fy=-50)
+
+# Solve all load patterns
+results_dict = model.solve()
+
+# Access results for each pattern
+dead_results = results_dict['Dead Load']
+live_results = results_dict['Live Load']
+```
+
+### Solve Specific Load Patterns
+
+```python
+# Only solve dead load
+results_dict = model.solve(load_pattern_name=['Dead Load'])
+
+# Solve multiple specific patterns
+results_dict = model.solve(load_pattern_name=['Dead Load', 'Live Load'])
+```
+
+### Get Results for a Specific Pattern
+
+```python
+# Solve all patterns
+model.solve()
+
+# Get results for a specific pattern
+dead_results = model.get_results('Dead Load')
+
+# Get displacements
+displacements = dead_results.get_model_displacements()
+
+# Get reactions
+reactions = dead_results.get_model_reactions()
+```
+
+## Working with Results
+
+After solving, you can access results in multiple ways:
+
+```python
+# Method 1: From solve() return value
+results_dict = model.solve()
+dead_results = results_dict['Dead Load']
+
+# Method 2: Using get_results()
+model.solve()
+dead_results = model.get_results('Dead Load')
+
+# Method 3: Direct access to model.results
+model.solve()
+dead_results = model.results['Dead Load']
+```
+
+## Performance Tips
+
+- For large models with many load patterns, solve only the patterns you need by specifying them explicitly
+- Set unused load patterns to `INACTIVE` state before solving
+- Use `get_results()` to access previously computed results without re-solving
+
+## See Also
+
+- [Results API](/api/results) - Detailed documentation on accessing and using results
+- [Load Patterns](/api/load-patterns) - Creating and managing load patterns
+- [Loads](/api/loads) - Applying different types of loads

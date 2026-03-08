@@ -1,0 +1,399 @@
+---
+title: Local Node Axes
+description: Define custom coordinate systems at nodes for inclined supports and loads
+---
+
+## Overview
+
+Local node axes allow you to define **custom coordinate systems** at individual nodes. This is essential when you need to apply loads, restraints, or elastic supports in directions that don't align with the global X-Y axes, such as on inclined surfaces or rotated supports.
+
+By default, all nodes use the global coordinate system. Local axes rotate this system by a specified angle about the Z-axis, creating a new local X-Y coordinate system at the node.
+
+## When to Use Local Axes
+
+<CardGroup cols={2}>
+  <Card title="Inclined Supports" icon="mountain">
+    Model supports on sloped surfaces or inclined planes
+  </Card>
+  <Card title="Rotated Loads" icon="rotate">
+    Apply loads in non-standard directions relative to node geometry
+  </Card>
+  <Card title="Skewed Restraints" icon="compass">
+    Define boundary conditions along inclined or rotated axes
+  </Card>
+  <Card title="Local Springs" icon="springs">
+    Orient elastic supports perpendicular to inclined surfaces
+  </Card>
+</CardGroup>
+
+## Syntax
+
+```python
+model.add_local_axis_for_node(node_id, angle)
+```
+
+### Parameters
+
+<ParamField path="node_id" type="int" required>
+  ID of the node to define local axes for
+</ParamField>
+
+<ParamField path="angle" type="float" required>
+  Rotation angle of the local axes **in radians**. Positive angles rotate counter-clockwise from the global X-axis.
+</ParamField>
+
+<Note>
+**Important**: The angle must be specified in **radians**, not degrees. To convert degrees to radians:
+```python
+import math
+angle_radians = angle_degrees * math.pi / 180
+```
+</Note>
+
+## How Local Axes Work
+
+When you define a local axis at a node:
+
+1. The local X-axis is rotated by `angle` from the global X-axis
+2. The local Y-axis is perpendicular to the local X-axis (rotated 90° counter-clockwise)
+3. The local Z-axis remains the same as the global Z-axis (out-of-plane for 2D analysis)
+
+### Rotation Convention
+
+- **Angle = 0**: Local axes align with global axes
+- **Positive angle**: Counter-clockwise rotation when viewed from above (looking down the Z-axis)
+- **Negative angle**: Clockwise rotation
+
+```
+Global axes:           Local axes (45° rotation):
+    Y                       Y_local ↗
+    ↑                              /
+    |                             /
+    └──→ X              X_local →
+```
+
+## Examples
+
+### Basic Local Axis Definition
+
+Define a local axis rotated 30° counter-clockwise:
+
+```python
+import math
+from milcapy import SystemModel
+
+model = SystemModel()
+
+# Add node
+model.add_node(1, 0, 0)
+
+# Define local axis at 30 degrees
+angle_deg = 30
+angle_rad = angle_deg * math.pi / 180
+
+model.add_local_axis_for_node(node_id=1, angle=angle_rad)
+```
+
+### Inclined Support
+
+Model a roller support on a 30° inclined surface:
+
+```python
+import math
+from milcapy import SystemModel, BeamTheoriesType, CoordinateSystemType
+
+model = SystemModel()
+
+# Define structure
+model.add_material("concrete", modulus_elasticity=2.1e6, poisson_ratio=0.2)
+model.add_rectangular_section("beam", "concrete", base=0.3, height=0.5)
+
+# Create beam on incline
+model.add_node(1, 0, 0)
+model.add_node(2, 5, 0)
+model.add_member(1, 1, 2, "beam", BeamTheoriesType.EULER_BERNOULLI)
+
+# Support at node 1 on 30° incline
+inclination_angle = 30 * math.pi / 180
+model.add_local_axis_for_node(node_id=1, angle=inclination_angle)
+
+# Restrain in local Y (perpendicular to incline)
+# Free in local X (parallel to incline - roller)
+model.add_restraint(
+    node_id=1,
+    x=False,  # Free parallel to incline (local X)
+    y=True,   # Fixed perpendicular to incline (local Y)
+    rz=False
+)
+
+# Fixed support at other end
+model.add_restraint(2, True, True, False)
+
+# Apply gravity load
+model.add_load_pattern("Dead Load")
+model.add_distributed_load(1, "Dead Load", qa=0, qb=-10, typ="fy")  # Global Y
+
+model.solve()
+model.show()
+```
+
+<Tip>
+When using local axes with restraints, the restraint directions (X, Y, RZ) are interpreted in the local coordinate system at that node.
+</Tip>
+
+### Symmetric Inclined Frame
+
+Create a symmetric frame with inclined supports:
+
+```python
+import math
+
+model = SystemModel()
+model.add_material("steel", modulus_elasticity=2.1e8, poisson_ratio=0.3)
+model.add_rectangular_section("section", "steel", base=0.2, height=0.3)
+
+# Create A-frame structure
+model.add_node(1, 0, 0)      # Left base
+model.add_node(2, 2.5, 3)    # Apex
+model.add_node(3, 5, 0)      # Right base
+
+model.add_member(1, 1, 2, "section", BeamTheoriesType.TIMOSHENKO)
+model.add_member(2, 2, 3, "section", BeamTheoriesType.TIMOSHENKO)
+
+# Define local axes at base nodes (±37 degrees from example)
+left_angle = -37 * math.pi / 180   # Clockwise rotation
+right_angle = 37 * math.pi / 180   # Counter-clockwise rotation
+
+model.add_local_axis_for_node(node_id=1, angle=left_angle)
+model.add_local_axis_for_node(node_id=3, angle=right_angle)
+
+# Roller supports in local coordinates
+# Free parallel to incline, fixed perpendicular
+model.add_restraint(1, x=False, y=True, rz=False)
+model.add_restraint(3, x=False, y=True, rz=False)
+
+# Apply apex load
+model.add_load_pattern("Snow")
+model.add_point_load(2, "Snow", fx=0, fy=-100, mz=0)
+
+model.solve()
+```
+
+### Elastic Support on Incline
+
+Combine local axes with elastic supports:
+
+```python
+import math
+
+# Node on 45-degree incline
+model.add_node(5, 3, 2)
+
+# Define local axis
+angle = 45 * math.pi / 180
+model.add_local_axis_for_node(5, angle)
+
+# Add spring perpendicular to incline (local Y direction)
+model.add_elastic_support(
+    node_id=5,
+    kx=None,
+    ky=1000,  # Spring in local Y (perpendicular to incline)
+    krz=None,
+    CSys=CoordinateSystemType.LOCAL  # Use local coordinates
+)
+```
+
+<Note>
+When using `CSys=CoordinateSystemType.LOCAL` with elastic supports, the spring stiffnesses `kx`, `ky`, and `krz` are oriented according to the local axes defined at the node.
+</Note>
+
+## Applying Loads with Local Axes
+
+Loads are typically specified in **global coordinates** unless the command specifically supports local coordinates:
+
+```python
+# Local axis at 30 degrees
+model.add_local_axis_for_node(1, 30 * math.pi / 180)
+
+# Point load: Components are in GLOBAL coordinates
+model.add_point_load(
+    node_id=1,
+    load_pattern="Live",
+    fx=10,   # Global X direction
+    fy=-20,  # Global Y direction
+    mz=0
+)
+```
+
+If you need to apply a load in local directions, calculate the global components:
+
+```python
+import math
+
+# Local axis angle
+angle = 30 * math.pi / 180
+
+# Desired load in local coordinates
+fx_local = 10  # Force along local X
+fy_local = -20  # Force along local Y
+
+# Transform to global coordinates
+fx_global = fx_local * math.cos(angle) - fy_local * math.sin(angle)
+fy_global = fx_local * math.sin(angle) + fy_local * math.cos(angle)
+
+model.add_point_load(
+    node_id=1,
+    load_pattern="Live",
+    fx=fx_global,
+    fy=fy_global,
+    mz=0
+)
+```
+
+## Common Angles
+
+Here are some common angles in both degrees and radians:
+
+| Degrees | Radians | Description |
+|---------|---------|-------------|
+| 0° | 0 | Aligned with global axes |
+| 30° | π/6 ≈ 0.524 | Common roof pitch |
+| 45° | π/4 ≈ 0.785 | Diagonal |
+| 60° | π/3 ≈ 1.047 | Steep incline |
+| 90° | π/2 ≈ 1.571 | Perpendicular |
+| -30° | -π/6 ≈ -0.524 | Clockwise 30° |
+| -45° | -π/4 ≈ -0.785 | Clockwise 45° |
+
+```python
+import math
+
+# Quick reference
+angle_30 = math.pi / 6
+angle_45 = math.pi / 4
+angle_60 = math.pi / 3
+angle_90 = math.pi / 2
+```
+
+## Verification and Visualization
+
+<Tip>
+After defining local axes, visualize your model to verify the axes are oriented correctly:
+
+```python
+model.show()
+```
+
+Check that:
+1. Restraints prevent movement in the expected directions
+2. Deformations align with the expected behavior
+3. Reaction forces are perpendicular to support surfaces (for rollers)
+</Tip>
+
+## Advanced Example: Multi-Support Structure
+
+A structure with different local axes at multiple nodes:
+
+```python
+import math
+from milcapy import SystemModel, BeamTheoriesType, CoordinateSystemType
+
+model = SystemModel()
+model.add_material("concrete", modulus_elasticity=2.5e6, poisson_ratio=0.2)
+model.add_rectangular_section("member", "concrete", base=0.3, height=0.4)
+
+# Create complex structure
+model.add_node(1, 0, 0)      # Support 1: 30° incline
+model.add_node(2, 3, 1)      # Interior node
+model.add_node(3, 6, 0)      # Support 2: -30° incline
+model.add_node(4, 3, 3)      # Top node
+
+# Add members
+model.add_member(1, 1, 2, "member", BeamTheoriesType.TIMOSHENKO)
+model.add_member(2, 2, 3, "member", BeamTheoriesType.TIMOSHENKO)
+model.add_member(3, 2, 4, "member", BeamTheoriesType.TIMOSHENKO)
+
+# Different local axes at supports
+model.add_local_axis_for_node(1, 30 * math.pi / 180)   # Left support
+model.add_local_axis_for_node(3, -30 * math.pi / 180)  # Right support
+
+# Inclined roller supports
+model.add_restraint(1, x=False, y=True, rz=False)  # Roller on left incline
+model.add_restraint(3, x=False, y=True, rz=False)  # Roller on right incline
+
+# Elastic support at top with local axes
+model.add_local_axis_for_node(4, 45 * math.pi / 180)
+model.add_elastic_support(
+    node_id=4,
+    kx=100,
+    ky=100,
+    CSys=CoordinateSystemType.LOCAL
+)
+
+# Apply loads
+model.add_load_pattern("Load")
+model.add_point_load(4, "Load", fx=0, fy=-50, mz=0)
+model.add_point_load(2, "Load", fx=20, fy=0, mz=0)
+
+model.solve()
+model.show()
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Incorrect angle units**: Remember to use radians, not degrees
+   ```python
+   # Wrong
+   model.add_local_axis_for_node(1, 30)  # This is 30 radians!
+   
+   # Correct
+   model.add_local_axis_for_node(1, 30 * math.pi / 180)
+   ```
+
+2. **Unexpected restraint behavior**: Verify local axes are oriented as intended
+   
+3. **Load direction confusion**: Remember loads are typically in global coordinates
+
+<Warning>
+Be careful when combining local axes with member local axes. Node local axes affect boundary conditions and supports, while member local axes affect member orientation. These are independent systems.
+</Warning>
+
+## Best Practices
+
+1. **Document local axes**: Keep notes on which nodes have local axes and why
+2. **Use consistent conventions**: Establish sign conventions for your project (e.g., always measure angles from horizontal)
+3. **Verify with simple cases**: Test local axes behavior with simple models first
+4. **Visualize before analysis**: Check model geometry and supports before solving
+5. **Use math.pi**: Always use `math.pi` for accurate angle conversion
+
+## Coordinate Transformation Reference
+
+For advanced users, the transformation from local to global coordinates:
+
+```python
+import math
+
+def local_to_global(fx_local, fy_local, angle):
+    """Transform force components from local to global coordinates."""
+    fx_global = fx_local * math.cos(angle) - fy_local * math.sin(angle)
+    fy_global = fx_local * math.sin(angle) + fy_local * math.cos(angle)
+    return fx_global, fy_global
+
+def global_to_local(fx_global, fy_global, angle):
+    """Transform force components from global to local coordinates."""
+    fx_local = fx_global * math.cos(angle) + fy_global * math.sin(angle)
+    fy_local = -fx_global * math.sin(angle) + fy_global * math.cos(angle)
+    return fx_local, fy_local
+```
+
+## Related Topics
+
+<CardGroup cols={2}>
+  <Card title="Elastic Supports" icon="arrows-up-down" href="/advanced/elastic-supports">
+    Apply spring supports in local coordinates
+  </Card>
+  <Card title="Restraints" icon="anchor" href="/api/restraints">
+    Define boundary conditions at nodes
+  </Card>
+</CardGroup>

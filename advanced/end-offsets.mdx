@@ -1,0 +1,213 @@
+---
+title: End Length Offsets (Rigid Arms)
+description: Model rigid end zones at member connections using end length offsets
+---
+
+## Overview
+
+End length offsets, also known as **rigid arms** or **rigid zones**, allow you to model rigid end zones at member connections. This is essential for accurately representing the behavior of members connected to large joints or when accounting for the actual width of connections in a structure.
+
+In real structures, connections often have finite dimensions. For example, when a beam frames into a wide column, the beam doesn't actually connect at a single point but extends into the column. End length offsets account for this behavior by creating rigid zones at member ends.
+
+## When to Use End Offsets
+
+<CardGroup cols={2}>
+  <Card title="Beam-Column Connections" icon="columns">
+    Account for column width when beams frame into wide columns
+  </Card>
+  <Card title="Rigid Joints" icon="lock">
+    Model joints with significant dimensions that behave rigidly
+  </Card>
+  <Card title="Panel Zones" icon="border-all">
+    Represent rigid panel zones in moment-resisting frames
+  </Card>
+  <Card title="Connection Details" icon="diagram-project">
+    Accurately model connection geometry in detailed analyses
+  </Card>
+</CardGroup>
+
+## Syntax
+
+```python
+model.add_end_length_offset(
+    member_id,
+    la=0,      # Length offset at start node
+    lb=0,      # Length offset at end node
+    qla=True,  # Apply loads on start rigid arm
+    qlb=True,  # Apply loads on end rigid arm
+    fla=1,     # Start rigid zone factor
+    flb=1      # End rigid zone factor
+)
+```
+
+### Parameters
+
+<ParamField path="member_id" type="int" required>
+  ID of the member to apply the end offset to
+</ParamField>
+
+<ParamField path="la" type="float" default="0">
+  Length offset at the start node (node i). Positive values extend the rigid zone away from the member.
+</ParamField>
+
+<ParamField path="lb" type="float" default="0">
+  Length offset at the end node (node j). Positive values extend the rigid zone away from the member.
+</ParamField>
+
+<ParamField path="qla" type="bool" default="True">
+  Whether to apply loads on the start rigid arm. If `True`, loads applied to the start node affect the rigid arm.
+</ParamField>
+
+<ParamField path="qlb" type="bool" default="True">
+  Whether to apply loads on the end rigid arm. If `True`, loads applied to the end node affect the rigid arm.
+</ParamField>
+
+<ParamField path="fla" type="float" default="1">
+  Stiffness factor for the start rigid zone (typically 1 for fully rigid)
+</ParamField>
+
+<ParamField path="flb" type="float" default="1">
+  Stiffness factor for the end rigid zone (typically 1 for fully rigid)
+</ParamField>
+
+## Examples
+
+### Beam Framing into Column
+
+When a beam frames into a column, you can offset the beam connection to account for the column width:
+
+```python
+from milcapy import SystemModel, BeamTheoriesType
+
+model = SystemModel()
+
+# Define material and sections
+model.add_material("steel", modulus_elasticity=2.1e8, poisson_ratio=0.3)
+model.add_rectangular_section("column", "steel", base=0.4, height=0.4)
+model.add_rectangular_section("beam", "steel", base=0.3, height=0.5)
+
+# Create column (vertical member)
+model.add_node(1, 0, 0)
+model.add_node(2, 0, 3)
+model.add_member(1, 1, 2, "column", BeamTheoriesType.TIMOSHENKO)
+
+# Create beam (horizontal member)
+model.add_node(3, 5, 3)
+model.add_member(2, 2, 3, "beam", BeamTheoriesType.TIMOSHENKO)
+
+# Apply end offset to account for column width (0.4m / 2 = 0.2m)
+column_width = 0.4
+length_offset = column_width / 2
+
+model.add_end_length_offset(
+    member_id=2,
+    la=length_offset,  # Offset at connection to column
+    qla=True           # Apply loads on rigid arm
+)
+
+# Add restraints
+model.add_restraint(1, True, True, True)
+model.add_restraint(3, False, True, False)
+
+# Add loads
+model.add_load_pattern("Dead Load")
+model.add_point_load(3, "Dead Load", fx=0, fy=-50, mz=0)
+
+# Solve and visualize
+model.solve()
+model.show()
+```
+
+<Tip>
+The end offset is typically half the width of the connecting member to represent the rigid zone extending from the centerline to the face of the member.
+</Tip>
+
+### Symmetric Connection with Both End Offsets
+
+For a beam connected to columns on both ends:
+
+```python
+# Create model with columns on both ends
+model.add_node(1, 0, 3)     # Left column top
+model.add_node(2, 5, 3)     # Right column top
+model.add_node(3, 10, 3)    # Far right column top
+
+# Beam spanning between columns
+model.add_member(5, 1, 3, "beam", BeamTheoriesType.TIMOSHENKO)
+
+# Apply offsets on both ends
+length_offset = 0.2  # Half of column width
+
+model.add_end_length_offset(
+    member_id=5,
+    la=length_offset,  # Offset at left column
+    lb=length_offset,  # Offset at right column
+    qla=True,
+    qlb=True
+)
+```
+
+### Advanced: Variable Rigid Zone Factors
+
+You can adjust the stiffness of the rigid zones using the `fla` and `flb` parameters:
+
+```python
+# Create semi-rigid end zones (50% stiffness)
+model.add_end_length_offset(
+    member_id=3,
+    la=0.15,
+    lb=0.15,
+    fla=0.5,  # 50% rigid at start
+    flb=0.5   # 50% rigid at end
+)
+```
+
+<Warning>
+Changing the rigid zone factors from 1.0 creates semi-rigid connections, which may not be appropriate for all analyses. Use `fla=1` and `flb=1` for fully rigid end zones in most cases.
+</Warning>
+
+## Load Application on Rigid Arms
+
+The `qla` and `qlb` parameters control whether loads applied to the nodes are transferred to the rigid arms:
+
+- **`qla=True` / `qlb=True`**: Loads on the node are applied to the rigid arm (typical case)
+- **`qla=False` / `qlb=False`**: Loads on the node bypass the rigid arm and go directly to the flexible member
+
+```python
+# Loads applied to rigid arm (typical)
+model.add_end_length_offset(2, la=0.2, qla=True)
+
+# Loads bypass rigid arm (special case)
+model.add_end_length_offset(3, la=0.2, qla=False)
+```
+
+## Effect on Analysis Results
+
+End length offsets affect:
+
+1. **Member forces**: The effective length of the flexible portion is reduced
+2. **Displacements**: Rigid zones don't deform, affecting overall displacement patterns
+3. **Moment distribution**: Moments are transferred through the rigid zones
+4. **Effective stiffness**: The model's overall stiffness changes due to the rigid connections
+
+<Note>
+Always verify that your end offsets correctly represent the physical geometry of your structure. Incorrect offsets can lead to significant errors in analysis results.
+</Note>
+
+## Best Practices
+
+1. **Use realistic dimensions**: Base offsets on actual member dimensions
+2. **Check geometry**: Verify that rigid zones don't overlap or create invalid geometry
+3. **Document assumptions**: Keep track of which members have offsets and why
+4. **Validate results**: Compare results with and without offsets to understand their impact
+
+## Related Topics
+
+<CardGroup cols={2}>
+  <Card title="Member Releases" icon="link-slash" href="/advanced/releases">
+    Control moment and force transfer at connections
+  </Card>
+  <Card title="Elastic Supports" icon="arrows-up-down" href="/advanced/elastic-supports">
+    Add spring supports to nodes
+  </Card>
+</CardGroup>

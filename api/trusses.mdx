@@ -1,0 +1,125 @@
+---
+title: 'add_truss()'
+description: 'Add truss elements to the structural model'
+---
+
+Add a truss element to the structural model. Truss elements are axial-force-only members with 2 degrees of freedom per node (ux, uy).
+
+## Syntax
+
+```python
+model.add_truss(id, node_i_id, node_j_id, section_name)
+```
+
+## Parameters
+
+<ParamField path="id" type="int" required>
+  Unique identifier for the truss element.
+</ParamField>
+
+<ParamField path="node_i_id" type="int" required>
+  ID of the initial (start) node.
+</ParamField>
+
+<ParamField path="node_j_id" type="int" required>
+  ID of the final (end) node.
+</ParamField>
+
+<ParamField path="section_name" type="str" required>
+  Name of the section previously defined with `add_rectangular_section()`, `add_circular_section()`, or `add_generic_section()`.
+</ParamField>
+
+## Returns
+
+Returns a `TrussElement` object representing the created truss element.
+
+## Raises
+
+- `ValueError`: If a truss element with the same ID already exists.
+- `ValueError`: If the specified nodes don't exist.
+- `ValueError`: If the specified section doesn't exist.
+
+## Example
+
+```python
+import milcapy as milca
+
+model = milca.SystemMilcaModel()
+
+# Add material
+model.add_material('steel', modulus_elasticity=200e9, poisson_ratio=0.3)
+
+# Add section for truss members
+model.add_rectangular_section('truss_sec', 'steel', base=0.05, height=0.05)
+
+# Add nodes for a simple truss
+model.add_node(1, 0.0, 0.0)
+model.add_node(2, 4.0, 0.0)
+model.add_node(3, 2.0, 3.0)
+
+# Add truss elements
+model.add_truss(1, 1, 2, 'truss_sec')  # Bottom chord
+model.add_truss(2, 1, 3, 'truss_sec')  # Left diagonal
+model.add_truss(3, 2, 3, 'truss_sec')  # Right diagonal
+```
+
+## Complete Truss Example
+
+```python
+import milcapy as milca
+
+# Create model
+model = milca.SystemMilcaModel()
+
+# Define material
+model.add_material('steel', modulus_elasticity=200e9, poisson_ratio=0.3, specific_weight=78500)
+
+# Define section
+model.add_circular_section('rod', 'steel', diameter=0.025)
+
+# Create a Warren truss
+# Bottom nodes
+model.add_node(1, 0.0, 0.0)
+model.add_node(2, 2.0, 0.0)
+model.add_node(3, 4.0, 0.0)
+model.add_node(4, 6.0, 0.0)
+
+# Top nodes
+model.add_node(5, 1.0, 1.5)
+model.add_node(6, 3.0, 1.5)
+model.add_node(7, 5.0, 1.5)
+
+# Bottom chord
+model.add_truss(1, 1, 2, 'rod')
+model.add_truss(2, 2, 3, 'rod')
+model.add_truss(3, 3, 4, 'rod')
+
+# Top chord
+model.add_truss(4, 5, 6, 'rod')
+model.add_truss(5, 6, 7, 'rod')
+
+# Diagonals
+model.add_truss(6, 1, 5, 'rod')
+model.add_truss(7, 2, 5, 'rod')
+model.add_truss(8, 2, 6, 'rod')
+model.add_truss(9, 3, 6, 'rod')
+model.add_truss(10, 3, 7, 'rod')
+model.add_truss(11, 4, 7, 'rod')
+
+# Add boundary conditions
+model.add_restraint(1, ux=True, uy=True, rz=False)  # Fixed support
+model.add_restraint(4, ux=False, uy=True, rz=False)  # Roller support
+```
+
+<Info>
+  Truss elements only carry axial forces and cannot resist bending moments or shear forces. Use frame elements (`add_member()`) if you need to model bending behavior.
+</Info>
+
+<Note>
+  When applying distributed loads to truss elements, only axial loads (in the LOCAL_1 direction) are permitted.
+</Note>
+
+## Related
+
+- [add_node()](/api/nodes) - Add nodes to the model
+- [add_member()](/api/members) - Add frame/beam elements

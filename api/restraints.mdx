@@ -1,0 +1,330 @@
+---
+title: Restraints & Assignments
+description: Methods for applying boundary conditions, supports, and member modifications in milcapy
+---
+
+These methods allow you to define boundary conditions, elastic supports, local coordinate systems, end offsets, releases, and property modifiers for your structural model.
+
+## add_restraint()
+
+Applies restraints (fixed boundary conditions) to a node.
+
+```python
+model.add_restraint(
+    node_id=1,
+    ux=True,
+    uy=True,
+    rz=False
+)
+```
+
+### Parameters
+
+<ParamField path="node_id" type="int" required>
+  ID of the node where restraints are applied
+</ParamField>
+
+<ParamField path="ux" type="bool" required>
+  If `True`, restrains translation in X direction
+</ParamField>
+
+<ParamField path="uy" type="bool" required>
+  If `True`, restrains translation in Y direction
+</ParamField>
+
+<ParamField path="rz" type="bool" required>
+  If `True`, restrains rotation about Z axis
+</ParamField>
+
+### Raises
+
+- `ValueError` - If the node does not exist
+- `ValueError` - If ux, uy, or rz are not boolean values
+
+---
+
+## add_elastic_support()
+
+Applies elastic spring supports to a node.
+
+```python
+model.add_elastic_support(
+    node_id=1,
+    kx=1000.0,
+    ky=2000.0,
+    krz=500.0,
+    CSys=CoordinateSystemType.GLOBAL
+)
+```
+
+### Parameters
+
+<ParamField path="node_id" type="int" required>
+  ID of the node where elastic support is applied
+</ParamField>
+
+<ParamField path="kx" type="float | None" default="None">
+  Spring stiffness in X direction. `None` means no spring in this direction
+</ParamField>
+
+<ParamField path="ky" type="float | None" default="None">
+  Spring stiffness in Y direction. `None` means no spring in this direction
+</ParamField>
+
+<ParamField path="krz" type="float | None" default="None">
+  Rotational spring stiffness about Z axis. `None` means no rotational spring
+</ParamField>
+
+<ParamField path="CSys" type="str | CoordinateSystemType" default="'GLOBAL'">
+  Coordinate system for spring directions. Options:
+  - `'GLOBAL'` or `CoordinateSystemType.GLOBAL`
+  - `'LOCAL'` or `CoordinateSystemType.LOCAL`
+</ParamField>
+
+### Raises
+
+- `ValueError` - If the node does not exist
+
+---
+
+## add_local_axis_for_node()
+
+Defines a local coordinate system for a node by specifying a rotation angle.
+
+```python
+model.add_local_axis_for_node(
+    node_id=1,
+    angle=45.0  # degrees
+)
+```
+
+### Parameters
+
+<ParamField path="node_id" type="int" required>
+  ID of the node
+</ParamField>
+
+<ParamField path="angle" type="float" required>
+  Rotation angle of the local axis in degrees (counterclockwise from global X)
+</ParamField>
+
+### Raises
+
+- `ValueError` - If the node does not exist
+
+### Notes
+
+Local axes are useful for:
+- Applying inclined supports
+- Getting results in a node-specific coordinate system
+- Defining local load directions
+
+---
+
+## add_end_length_offset()
+
+Adds rigid end offsets (rigid arms) to a member.
+
+```python
+model.add_end_length_offset(
+    member_id=1,
+    la=0.5,
+    lb=0.5,
+    qla=True,
+    qlb=True,
+    fla=1.0,
+    flb=1.0
+)
+```
+
+### Parameters
+
+<ParamField path="member_id" type="int" required>
+  ID of the member
+</ParamField>
+
+<ParamField path="la" type="float" default="0.0">
+  End offset length at start node (i-end)
+</ParamField>
+
+<ParamField path="lb" type="float" default="0.0">
+  End offset length at end node (j-end)
+</ParamField>
+
+<ParamField path="qla" type="bool" default="True">
+  If `True`, loads are applied on the rigid arm at start node
+</ParamField>
+
+<ParamField path="qlb" type="bool" default="True">
+  If `True`, loads are applied on the rigid arm at end node
+</ParamField>
+
+<ParamField path="fla" type="float" default="1.0">
+  Rigid zone factor for start node (1.0 = fully rigid)
+</ParamField>
+
+<ParamField path="flb" type="float" default="1.0">
+  Rigid zone factor for end node (1.0 = fully rigid)
+</ParamField>
+
+### Raises
+
+- `ValueError` - If the member does not exist
+
+---
+
+## add_releases()
+
+Adds member end releases to create pins or other partial connections.
+
+```python
+model.add_releases(
+    member_id=1,
+    pi=False,
+    vi=False,
+    mi=True,  # Moment release at start
+    pj=False,
+    vj=False,
+    mj=False
+)
+```
+
+### Parameters
+
+<ParamField path="member_id" type="int" required>
+  ID of the member
+</ParamField>
+
+<ParamField path="pi" type="bool" default="False">
+  If `True`, releases axial force at start node (i-end)
+</ParamField>
+
+<ParamField path="vi" type="bool" default="False">
+  If `True`, releases shear force at start node (i-end)
+</ParamField>
+
+<ParamField path="mi" type="bool" default="False">
+  If `True`, releases moment at start node (i-end)
+</ParamField>
+
+<ParamField path="pj" type="bool" default="False">
+  If `True`, releases axial force at end node (j-end)
+</ParamField>
+
+<ParamField path="vj" type="bool" default="False">
+  If `True`, releases shear force at end node (j-end)
+</ParamField>
+
+<ParamField path="mj" type="bool" default="False">
+  If `True`, releases moment at end node (j-end)
+</ParamField>
+
+### Raises
+
+- `ValueError` - If the member does not exist
+- `ValueError` - If both axial releases (pi and pj) are specified
+- `ValueError` - If both shear releases (vi and vj) are specified
+
+---
+
+## set_property_modifiers()
+
+Modifies the properties of a section by applying scaling factors.
+
+```python
+model.set_property_modifiers(
+    section_name='Column',
+    axial_area=1.0,
+    shear_area=0.8,
+    moment_inertia=0.7,
+    weight=1.0
+)
+```
+
+### Parameters
+
+<ParamField path="section_name" type="str" required>
+  Name of the section to modify
+</ParamField>
+
+<ParamField path="axial_area" type="float" default="1.0">
+  Multiplier for axial area (1.0 = no modification)
+</ParamField>
+
+<ParamField path="shear_area" type="float" default="1.0">
+  Multiplier for shear area (1.0 = no modification)
+</ParamField>
+
+<ParamField path="moment_inertia" type="float" default="1.0">
+  Multiplier for moment of inertia (1.0 = no modification)
+</ParamField>
+
+<ParamField path="weight" type="float" default="1.0">
+  Multiplier for weight (1.0 = no modification)
+</ParamField>
+
+### Raises
+
+- `ValueError` - If the section does not exist
+
+---
+
+## Example Usage
+
+```python
+import milcapy as milca
+from milcapy.utils.types import CoordinateSystemType
+
+model = milca.SystemMilcaModel()
+
+# Add fixed support
+model.add_restraint(
+    node_id=1,
+    ux=True,  # Fixed in X
+    uy=True,  # Fixed in Y
+    rz=True   # Fixed rotation
+)
+
+# Add pinned support (rotation free)
+model.add_restraint(
+    node_id=2,
+    ux=True,
+    uy=True,
+    rz=False  # Free to rotate
+)
+
+# Add elastic support
+model.add_elastic_support(
+    node_id=3,
+    ky=5000.0  # Vertical spring only
+)
+
+# Add inclined support at 30 degrees
+model.add_local_axis_for_node(node_id=4, angle=30.0)
+model.add_restraint(
+    node_id=4,
+    ux=True,  # Fixed along inclined axis
+    uy=True,
+    rz=False
+)
+
+# Create simply supported beam with moment releases
+model.add_releases(
+    member_id=1,
+    mi=True,  # Pin at start
+    mj=True   # Pin at end
+)
+
+# Add rigid end offsets for beam-column connection
+model.add_end_length_offset(
+    member_id=2,
+    la=0.3,  # 0.3m offset at start
+    lb=0.3   # 0.3m offset at end
+)
+
+# Reduce stiffness for cracked section analysis
+model.set_property_modifiers(
+    section_name='Beam',
+    moment_inertia=0.5  # 50% of gross section
+)
+```

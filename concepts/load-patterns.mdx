@@ -1,0 +1,381 @@
+---
+title: 'Load Patterns'
+description: 'Organize and apply structural loads using load patterns'
+icon: 'weight-hanging'
+---
+
+## Overview
+
+Load patterns are named collections of loads that can be analyzed independently or combined. They allow you to organize different load cases (dead load, live load, wind, etc.) and run multiple analyses efficiently.
+
+## Creating Load Patterns
+
+Create a load pattern with a unique name:
+
+```python
+load_pattern = model.add_load_pattern(
+    name="DL",                    # Dead Load
+    self_weight_multiplier=1.0,   # Include self-weight
+    state="ACTIVE"                 # Active or inactive
+)
+```
+
+### Load Pattern Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `name` | str | Unique identifier for the load pattern |
+| `self_weight_multiplier` | float | Factor for automatic self-weight calculation (0.0 to disable) |
+| `state` | StateType | `"ACTIVE"` or `"INACTIVE"` |
+
+<Note>
+  Setting `self_weight_multiplier=1.0` automatically calculates and applies gravitational loads based on member sections and material densities.
+</Note>
+
+## Types of Loads
+
+milcapy supports multiple load types that can be added to load patterns.
+
+### Point Loads
+
+Concentrated forces and moments applied at nodes:
+
+```python
+model.add_point_load(
+    node_id=3,
+    load_pattern_name="LL",
+    fx=5000.0,      # Force in X direction (N)
+    fy=-10000.0,    # Force in Y direction (N)
+    mz=2000.0,      # Moment about Z axis (N·m)
+    CSys="GLOBAL",  # Coordinate system: "GLOBAL" or "LOCAL"
+    replace=False   # True to replace existing load
+)
+```
+
+<Accordion title="Coordinate Systems">
+  **Global Coordinate System (`"GLOBAL"`)**:
+  - X: Horizontal (typically left-right)
+  - Y: Vertical (typically up-down)
+  - Z: Out-of-plane (right-hand rule)
+  
+  **Local Coordinate System (`"LOCAL"`)**:
+  - Aligned with node's local axis (if defined)
+  - Useful for inclined supports or non-orthogonal loading
+</Accordion>
+
+### Distributed Loads
+
+Linearly varying loads along frame elements:
+
+```python
+model.add_distributed_load(
+    member_id=1,
+    load_pattern_name="DL",
+    load_start=-5000.0,  # Load at start (N/m)
+    load_end=-5000.0,    # Load at end (N/m)
+    CSys="LOCAL",        # "LOCAL" or "GLOBAL"
+    direction="LOCAL_2", # Load direction
+    load_type="FORCE",   # "FORCE" or "MOMENT"
+    replace=False
+)
+```
+
+#### Load Directions
+
+<Accordion title="Local Directions">
+  - `"LOCAL_1"`: Along member axis (axial)
+  - `"LOCAL_2"`: Perpendicular to member axis (transverse)
+  - `"LOCAL_3"`: Moment about local z-axis
+</Accordion>
+
+<Accordion title="Global Directions">
+  - `"X"`: Global X direction
+  - `"Y"`: Global Y direction  
+  - `"GRAVITY"`: Downward (negative Y)
+  - `"X_PROJ"`: Projected onto X axis
+  - `"Y_PROJ"`: Projected onto Y axis
+  - `"GRAVITY_PROJ"`: Gravity projected onto member
+  - `"MOMENT"`: Moment about Z axis
+</Accordion>
+
+#### Common Load Patterns
+
+<Steps>
+  <Step title="Uniform transverse load">
+    ```python
+    # Uniform downward load on a beam
+    model.add_distributed_load(
+        member_id=1,
+        load_pattern_name="DL",
+        load_start=-5000,
+        load_end=-5000,
+        direction="LOCAL_2"
+    )
+    ```
+  </Step>
+  
+  <Step title="Triangular load">
+    ```python
+    # Triangular load (zero at start, max at end)
+    model.add_distributed_load(
+        member_id=2,
+        load_pattern_name="WIND",
+        load_start=0,
+        load_end=-8000,
+        direction="LOCAL_2"
+    )
+    ```
+  </Step>
+  
+  <Step title="Axial load">
+    ```python
+    # Axial load along member
+    model.add_distributed_load(
+        member_id=3,
+        load_pattern_name="THERMAL",
+        load_start=1000,
+        load_end=1000,
+        direction="LOCAL_1"
+    )
+    ```
+  </Step>
+</Steps>
+
+### Self-Weight
+
+Automatic gravity loads based on member mass:
+
+```python
+# Enable self-weight when creating load pattern
+model.add_load_pattern(
+    name="DL",
+    self_weight_multiplier=1.0  # 1.0 = full gravity, 1.4 = factored
+)
+
+# Or add/modify after creation
+model.add_self_weight(
+    load_pattern_name="DL",
+    factor=1.0
+)
+```
+
+<Tip>
+  Self-weight is automatically calculated as `A × γ × g` where:
+  - A = cross-sectional area
+  - γ = material specific weight
+  - g = gravitational acceleration (built into specific weight)
+</Tip>
+
+### Membrane Element Loads
+
+For 2D membrane elements (CST, quad elements):
+
+#### Uniform Temperature Load
+
+```python
+model.add_cst_uniform_temperature_load(
+    cst_id=1,
+    load_pattern_name="THERMAL",
+    dt=20.0  # Temperature change (°C or K)
+)
+```
+
+#### Uniform Distributed Load
+
+```python
+model.add_cst_uniform_distributed_load(
+    cst_id=1,
+    load_pattern_name="PRESSURE",
+    qx=1000.0,  # Load in X direction (N/m²)
+    qy=500.0    # Load in Y direction (N/m²)
+)
+```
+
+#### Edge Loads
+
+```python
+# Uniform edge load
+model.add_cst_uniform_edge_load(
+    cst_id=1,
+    load_pattern_name="WIND",
+    q=5000.0,  # Load magnitude (N/m)
+    edge=1     # Edge number (1, 2, or 3)
+)
+
+# Linear edge load
+model.add_cst_linear_edge_load(
+    cst_id=1,
+    load_pattern_name="WIND",
+    qi=2000.0,  # Load at start of edge
+    qj=8000.0,  # Load at end of edge
+    edge=2
+)
+```
+
+<Note>
+  For triangular elements, edges are numbered 1-3 counter-clockwise starting from the first node.
+</Note>
+
+## Managing Load Patterns
+
+### Activating/Deactivating Load Patterns
+
+```python
+# Deactivate a load pattern
+model.set_state_load_pattern(
+    load_pattern_name="WIND",
+    state="INACTIVE"
+)
+
+# Reactivate it
+model.set_state_load_pattern(
+    load_pattern_name="WIND",
+    state="ACTIVE"
+)
+```
+
+### Accessing Load Patterns
+
+```python
+# Get load pattern object
+load_pattern = model.load_patterns["DL"]
+
+# Check properties
+print(load_pattern.name)
+print(load_pattern.state)
+print(load_pattern.self_weight.multiplier)
+
+# Access loads
+point_loads = load_pattern.point_loads      # Dict: {node_id: PointLoad}
+dist_loads = load_pattern.distributed_loads  # Dict: {member_id: DistributedLoad}
+```
+
+## Complete Example: Multi-Pattern Loading
+
+```python
+from milcapy import SystemMilcaModel
+
+# Create model with geometry (simplified)
+model = SystemMilcaModel()
+# ... add materials, sections, nodes, elements ...
+
+# Dead Load Pattern
+dl = model.add_load_pattern(
+    name="DL",
+    self_weight_multiplier=1.0
+)
+
+# Add permanent uniform load
+model.add_distributed_load(
+    member_id=3,  # Beam
+    load_pattern_name="DL",
+    load_start=-2000,
+    load_end=-2000,
+    direction="LOCAL_2"
+)
+
+# Live Load Pattern  
+ll = model.add_load_pattern(
+    name="LL",
+    self_weight_multiplier=0.0  # No self-weight for live load
+)
+
+# Add live load to beam
+model.add_distributed_load(
+    member_id=3,
+    load_pattern_name="LL",
+    load_start=-4000,
+    load_end=-4000,
+    direction="LOCAL_2"
+)
+
+# Concentrated live load
+model.add_point_load(
+    node_id=5,
+    load_pattern_name="LL",
+    fy=-10000
+)
+
+# Wind Load Pattern
+wind = model.add_load_pattern(
+    name="WIND",
+    self_weight_multiplier=0.0
+)
+
+# Horizontal wind on columns
+model.add_point_load(
+    node_id=2,
+    load_pattern_name="WIND",
+    fx=5000
+)
+model.add_point_load(
+    node_id=3,
+    load_pattern_name="WIND",
+    fx=5000
+)
+```
+
+## Load Combination
+
+While load patterns define individual load cases, you typically analyze combinations:
+
+```python
+# Analyze each pattern independently
+model.analysis.run_linear_static("DL")
+model.analysis.run_linear_static("LL")
+model.analysis.run_linear_static("WIND")
+
+# Results are stored separately
+results_dl = model.results["DL"]
+results_ll = model.results["LL"]
+results_wind = model.results["WIND"]
+
+# Combine results manually for design
+# Example: 1.2*DL + 1.6*LL
+```
+
+<Note>
+  milcapy currently stores results per load pattern. You can create load combinations by running multiple analyses and combining results using the linear superposition principle.
+</Note>
+
+## Best Practices
+
+<Tip>
+  **Descriptive Names**: Use standard naming conventions:
+  - `"DL"` - Dead Load
+  - `"LL"` - Live Load
+  - `"WIND"` - Wind Load
+  - `"EQ"` - Earthquake Load
+  - `"SNOW"` - Snow Load
+</Tip>
+
+<Warning>
+  **Self-Weight Factor**: Be careful with `self_weight_multiplier`. Setting it to 1.0 in multiple load patterns will apply self-weight multiple times.
+</Warning>
+
+<Tip>
+  **Load Replacement**: Set `replace=True` when you want to overwrite an existing load. By default (`replace=False`), loads are additive.
+</Tip>
+
+<Tip>
+  **Sign Convention**: 
+  - Positive Y is typically upward
+  - Downward loads are negative: `fy=-10000`
+  - Moments follow right-hand rule
+</Tip>
+
+## Related Concepts
+
+<CardGroup cols={2}>
+  <Card title="Nodes & Elements" icon="diagram-project" href="/concepts/nodes-elements">
+    Understanding where loads are applied
+  </Card>
+  
+  <Card title="Boundary Conditions" icon="anchor" href="/concepts/boundary-conditions">
+    Define supports and restraints
+  </Card>
+  
+  <Card title="Running Analysis" icon="play" href="/analysis/solving">
+    Analyze load patterns and view results
+  </Card>
+</CardGroup>
